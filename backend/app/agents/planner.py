@@ -1,111 +1,152 @@
-# The Planner. For now it has one mode: survey the course. The survey runs
-# once after upload. It reads the uploaded material, drafts a topic outline
-# in a sensible order, and builds a map from each topic to the chunks that
-# cover it. The coverage map comes from real retrieval, so the outline is
-# grounded in what the material actually contains.
+# The Planner. Two modes, both tool using agents that search the material
+# themselves instead of being handed a fixed set of chunks.
 #
-# The per topic planning mode (plan one topic on demand) is added in a
-# later phase.
+# survey_course runs once at upload and builds the outline and coverage map.
+# plan_topic runs per request and plans one lesson, deciding for each point
+# whether the material supports it (source) or not (supplementary). The
+# model drives the searching: it decides the queries, judges if what came
+# back is enough, tries different queries on weak points, and when the
+# material truly does not cover something it says so. max_steps is only a
+# fuse.
 
 from sqlalchemy.orm import Session
 
-from app.llm.chat import chat_json
-from app.ingest.retrieve import retrieve_scored
+from app.agents.agent_loop import run_agent
+from app.ingest.retrieve import retrieve
 from app.store.models import Chunk, CourseOutline
 
-# how many chunks to show the model when it drafts the outline.
-SAMPLE_CHUNKS = 30
-# how many chunks to map to each topic for the coverage map.
-COVERAGE_K = 5
+MAX_SURVEY_CHUNKS = 24
 
 
-def plan_topic(topic: str, chunks: list[dict], learner_notes: str = "") -> dict:
-    # plan one lesson. decides the objective and the ordered points, and for
-    # each point whether it is covered by the sources or is supplementary.
-    # this is the substance. the builder renders it into slides.
-    joined = "\n\n".join(f"[{c['id']}] {c['text']}" for c in chunks) or "(no source chunks)"
-    messages = [
-        {"role": "system", "content": "You plan one lesson for a student from their material. Return JSON only."},
-        {"role": "user", "content": (
-            f"Topic: {topic}\n"
-            f"What we know about the learner: {learner_notes or 'nothing yet'}\n\n"
-            f"Source chunks (id in brackets):\n{joined}\n\n"
-            "Plan the lesson. Return JSON shaped like "
-            '{"topic": "a clean short title", "objective": "...", '
-            '"points": [{"point": "...", "provenance": "source", "chunk_ids": ["..."]}]}. '
-            "Use provenance 'source' for points the chunks cover and list the chunk ids. "
-            "Use 'supplementary' with an empty chunk_ids list for points you add from general knowledge."
-        )},
-    ]
-    return chat_json(messages)
+def _retrieve_tool(session, course_id):
+    def handler(args):
+        rows = retrieve(session, course_id, args.get("query", ""), k=5)
+        return {"chunks": [{"chunk_id": r.id, "text": r.text[:600], "loc": r.location} for r in rows]}
+    return handler
 
 
-def survey_course(session: Session, course_id: str) -> dict:
-    sample = _sample_chunks(session, course_id)
-    if not sample:
-        return {}
+# ---------- mode 2: plan one topic ----------
 
-    topics = _draft_outline(sample)
-    coverage = _build_coverage(session, course_id, topics)
+PLAN_TOOLS = [
+    {"type": "function", "function": {
+        "name": "retrieve",
+        "description": "Search the student's material for chunks related to a query.",
+        "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
+    }},
+    {"type": "function", "function": {
+        "name": "finish",
+        "description": "Record the lesson plan.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "topic": {"type": "string", "description": "a clean short title"},
+                "objective": {"type": "string"},
+                "points": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "point": {"type": "string"},
+                            "provenance": {"type": "string", "enum": ["source", "supplementary"]},
+                            "chunk_ids": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["point", "provenance"],
+                    },
+                },
+                "topic_absent": {
+                    "type": "boolean",
+                    "description": "true if the material does not cover this topic at all",
+                },
+            },
+            "required": ["topic", "objective", "points"],
+        },
+    }},
+]
 
-    result = {"topics": topics, "coverage": coverage}
-    session.add(CourseOutline(course_id=course_id, outline=result))
-    session.commit()
+
+def plan_topic(session: Session, course_id: str, topic: str, learner_notes: str = "", instruction: str = "") -> dict:
+    system = (
+        "You plan one lesson for a student from their own uploaded material. "
+        "Search the material with retrieve as many times as you need, trying different queries to "
+        "chase down the material for each point. For a point the material supports, set provenance "
+        "'source' and list the chunk_ids. For a point you add from general knowledge, set 'supplementary' "
+        "with an empty chunk_ids list. If the material does not cover the topic at all, set topic_absent. "
+        "When the plan is ready, call finish."
+    )
+    user = (
+        f"Topic the student asked about: {topic}\n"
+        f"Extra instruction, if any: {instruction or 'none'}\n"
+        f"What we know about the learner: {learner_notes or 'nothing yet'}\n"
+    )
+    result = run_agent(system, user, PLAN_TOOLS, {"retrieve": _retrieve_tool(session, course_id)}, max_steps=6)
+    if "points" not in result:
+        result = {"topic": topic, "objective": f"Understand {topic}", "points": [], "topic_absent": False}
     return result
 
 
-def _sample_chunks(session: Session, course_id: str) -> list[Chunk]:
-    # take an evenly spread sample so the model sees the whole document, not
-    # just the start.
-    rows = (
-        session.query(Chunk)
-        .filter(Chunk.course_id == course_id)
-        .order_by(Chunk.ordinal)
-        .all()
+# ---------- mode 1: survey the whole course ----------
+
+SURVEY_TOOLS = [
+    {"type": "function", "function": {
+        "name": "corpus_sample",
+        "description": "Get a spread of short snippets from across the whole material to see its breadth.",
+        "parameters": {"type": "object", "properties": {}},
+    }},
+    {"type": "function", "function": {
+        "name": "retrieve",
+        "description": "Search the material for chunks related to a query.",
+        "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
+    }},
+    {"type": "function", "function": {
+        "name": "finish",
+        "description": "Record the course outline.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "topics": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "topic": {"type": "string"},
+                            "summary": {"type": "string"},
+                            "prerequisites": {"type": "array", "items": {"type": "string"}},
+                            "chunk_ids": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["topic"],
+                    },
+                },
+            },
+            "required": ["topics"],
+        },
+    }},
+]
+
+
+def survey_course(session: Session, course_id: str) -> dict:
+    rows = session.query(Chunk).filter(Chunk.course_id == course_id).order_by(Chunk.ordinal).all()
+    if not rows:
+        return {}
+
+    def corpus_sample(_args):
+        step = max(1, len(rows) // MAX_SURVEY_CHUNKS)
+        sample = rows[::step][:MAX_SURVEY_CHUNKS]
+        return {"sample": [{"chunk_id": c.id, "text": c.text[:160]} for c in sample]}
+
+    handlers = {"corpus_sample": corpus_sample, "retrieve": _retrieve_tool(session, course_id)}
+    system = (
+        "You survey a student's uploaded material and build a course outline. "
+        "Start with corpus_sample to see the breadth, then use retrieve to look closer where you need to. "
+        "List the main topics in a sensible learning order, give each a short summary and its prerequisites, "
+        "and list the chunk_ids that cover each topic. Only include topics the material actually covers. "
+        "Call finish with the topics."
     )
-    if len(rows) <= SAMPLE_CHUNKS:
-        return rows
-    step = len(rows) / SAMPLE_CHUNKS
-    return [rows[int(i * step)] for i in range(SAMPLE_CHUNKS)]
+    user = "Survey this course and build the outline."
+    result = run_agent(system, user, SURVEY_TOOLS, handlers, max_steps=8)
 
-
-def _draft_outline(sample: list[Chunk]) -> list[dict]:
-    joined = "\n\n".join(f"[chunk {c.ordinal}] {c.text}" for c in sample)
-    messages = [
-        {
-            "role": "system",
-            "content": "You plan a short course from a student's own material. Return JSON only.",
-        },
-        {
-            "role": "user",
-            "content": (
-                "Here are pieces of the uploaded material:\n\n"
-                f"{joined}\n\n"
-                "List the main topics to teach, in a sensible learning order. "
-                'Return JSON shaped like {"topics": [{"topic": "...", '
-                '"summary": "...", "prerequisites": ["..."]}]}. '
-                "Only include topics the material actually covers."
-            ),
-        },
-    ]
-    data = chat_json(messages)
-    return data.get("topics", [])
-
-
-def _build_coverage(session: Session, course_id: str, topics: list[dict]) -> dict:
-    # for each topic, find the chunks that cover it and how close they are.
-    # the score is the cosine distance, so a smaller best_score means the
-    # material covers the topic well. a later phase uses this to decide
-    # source grounded versus supplementary.
-    coverage = {}
-    for item in topics:
-        topic = item.get("topic", "")
-        if not topic:
-            continue
-        query = f"{topic}. {item.get('summary', '')}"
-        scored = retrieve_scored(session, course_id, query, k=COVERAGE_K)
-        coverage[topic] = {
-            "chunks": [{"chunk_id": c.id, "score": round(d, 3)} for c, d in scored],
-            "best_score": round(scored[0][1], 3) if scored else None,
-        }
-    return coverage
+    topics = result.get("topics", [])
+    coverage = {t["topic"]: {"chunk_ids": t.get("chunk_ids", [])} for t in topics if t.get("topic")}
+    outline = {"topics": topics, "coverage": coverage}
+    session.add(CourseOutline(course_id=course_id, outline=outline))
+    session.commit()
+    return outline

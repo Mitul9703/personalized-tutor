@@ -45,8 +45,14 @@ def post_message(course_id: str, body: PostMessage, session: Session = Depends(g
         "retries": 0,
     }
     result = graph.invoke(state)
+
+    # answer or clarify turns reply with no deck
+    if "final_version" not in result:
+        return {"intent": result.get("intent"), "reply": result.get("response")}
+
     final = result["final_version"]
     return {
+        "intent": result.get("intent"),
         "artifact_id": final["artifact_id"],
         "version_id": final["version_id"],
         "version_number": final["version_number"],

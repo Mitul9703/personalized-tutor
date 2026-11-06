@@ -11,7 +11,7 @@
 
 import json
 
-from app.llm.chat import chat_tools
+from app.agents.agent_loop import run_agent
 from app.ingest.retrieve import retrieve
 
 MAX_STEPS = 10
@@ -122,38 +122,22 @@ def run_builder(session, course_id, *, plan, chunks, base_deck, instruction, int
     deck = base_deck if base_deck else {"title": plan.get("topic", "Untitled"), "slides": []}
     _ensure_ids(deck)
 
-    messages = [
-        {"role": "system", "content": (
-            "You build and edit a slide deck for a student using the tools. "
-            "Ground slides in the source chunks and cite their chunk_id. "
-            "Mark anything beyond the sources as provenance 'supplementary' with no citation. "
-            "Keep slides short and clear. Call finish when the deck is ready."
-        )},
-        {"role": "user", "content": _compose_task(plan, chunks, deck, instruction, intent, issues)},
-    ]
+    # each tool handler edits the working copy deck in place
+    def make_handler(tool_name):
+        return lambda args: _handle(tool_name, args, deck, session, course_id)
 
-    for _ in range(MAX_STEPS):
-        message = chat_tools(messages, TOOLS)
-        messages.append(message)
-        if not message.tool_calls:
-            break
-        done = False
-        for call in message.tool_calls:
-            name = call.function.name
-            try:
-                args = json.loads(call.function.arguments or "{}")
-            except json.JSONDecodeError:
-                args = {}
-            result = _handle(name, args, deck, session, course_id)
-            messages.append({
-                "role": "tool",
-                "tool_call_id": call.id,
-                "content": json.dumps(result),
-            })
-            if name == "finish":
-                done = True
-        if done:
-            break
+    handlers = {name: make_handler(name) for name in (
+        "set_deck", "add_slide", "update_slide", "delete_slide", "reorder_slides", "retrieve_more",
+    )}
+
+    system = (
+        "You build and edit a slide deck for a student using the tools. "
+        "Ground slides in the source chunks and cite their chunk_id. "
+        "Mark anything beyond the sources as provenance 'supplementary' with no citation. "
+        "Keep slides short and clear. Call finish when the deck is ready."
+    )
+    user = _compose_task(plan, chunks, deck, instruction, intent, issues)
+    run_agent(system, user, TOOLS, handlers, max_steps=MAX_STEPS)
 
     _ensure_ids(deck)
     return deck
