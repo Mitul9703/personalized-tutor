@@ -22,5 +22,8 @@ class Settings(BaseSettings):
     # chat provider we use.
     embed_model: str = "BAAI/bge-small-en-v1.5"
 
+    # where uploaded files are saved on disk
+    upload_dir: str = "uploads"
+
 
 settings = Settings()

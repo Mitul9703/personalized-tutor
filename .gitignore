@@ -1,7 +1,14 @@
+# private notes, not for the repo
+POST_M2_NOTES.md
+
 # env files (never commit secrets)
 .env
 .env.*
 !.env.example
+
+# uploaded files
+uploads/
+backend/uploads/
 
 # python
 __pycache__/
