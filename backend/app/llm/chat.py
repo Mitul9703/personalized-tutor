@@ -1,7 +1,9 @@
 # A thin wrapper around the chat model. We use the OpenAI SDK and point it
 # at a base url from config. This works for OpenAI now. Later we can put
-# LiteLLM behind this same function to reach AWS Bedrock without changing
+# LiteLLM behind these same functions to reach AWS Bedrock without changing
 # the callers.
+
+import json
 
 from openai import OpenAI
 
@@ -19,3 +21,15 @@ def chat(messages, model=None, **kwargs):
         **kwargs,
     )
     return response.choices[0].message.content
+
+
+def chat_json(messages, model=None, **kwargs):
+    # like chat, but asks the model for a json object and parses it. the
+    # prompt should say what shape of json we want.
+    response = _client.chat.completions.create(
+        model=model or settings.llm_model,
+        messages=messages,
+        response_format={"type": "json_object"},
+        **kwargs,
+    )
+    return json.loads(response.choices[0].message.content)
