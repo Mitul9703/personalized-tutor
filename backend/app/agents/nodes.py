@@ -1,12 +1,19 @@
 # The nodes of the agent graph. Each node takes the turn state and the
 # database session and returns the fields it wants to update in the state.
 #
-# For this phase the builder and critic are stubs. The builder returns a
-# fake deck and the critic always passes. The point right now is to get the
-# flow and the versioning right. The real builder and critic come next.
+# The orchestrator routes, the planner shapes the substance, the builder
+# renders slides with its tools, and the critic checks them. A failed check
+# sends the builder back with the critic notes, up to a cap. The finalize
+# node commits the finished draft as one new immutable version.
 
 from app.ingest.retrieve import retrieve_scored
-from app.store.models import StudyUnit, Artifact, ArtifactVersion, Message
+from app.store.models import StudyUnit, Artifact, ArtifactVersion, Message, LearnerModel
+from app.agents.planner import plan_topic
+from app.agents.builder import run_builder
+from app.agents.critic import review
+
+# the most build attempts before we give up and deliver the best draft.
+MAX_ATTEMPTS = 3
 
 
 def orchestrator(state: dict, session) -> dict:
@@ -20,89 +27,73 @@ def orchestrator(state: dict, session) -> dict:
 
 
 def planner(state: dict, session) -> dict:
-    # work out the topic and pull the chunks that cover it. this is the
-    # substance the builder will render.
+    # work out the topic, pull the chunks that cover it, and for a new topic
+    # plan the lesson substance.
     req = state["request"]
+    course_id = state["course_id"]
+
     if state["intent"] == "evolve":
         artifact = session.get(Artifact, req["artifact_id"])
         unit = session.get(StudyUnit, artifact.study_unit_id)
         topic = unit.topic
+        scored = retrieve_scored(session, course_id, f"{topic}. {req['text']}", k=5)
+        plan = {"topic": topic, "instruction": req["text"], "chunk_ids": [c.id for c, _ in scored]}
     else:
         topic = req["text"]
+        scored = retrieve_scored(session, course_id, topic, k=6)
+        brief = [{"id": c.id, "text": c.text} for c, _ in scored]
+        plan = plan_topic(topic, brief, _learner_notes(session, course_id))
 
-    scored = retrieve_scored(session, state["course_id"], topic, k=5)
-    plan = {
-        "topic": topic,
-        "objective": f"Understand {topic}",
-        "chunk_ids": [c.id for c, _ in scored],
-    }
     chunks = [{"id": c.id, "text": c.text, "location": c.location} for c, _ in scored]
     return {"plan_slice": plan, "retrieved_chunks": chunks}
 
 
 def builder(state: dict, session) -> dict:
-    # STUB builder. makes a fake deck so we can test the flow and the
-    # versioning. for an edit it starts from the current deck and adds a
-    # slide so the new version clearly differs from its parent.
-    plan = state["plan_slice"]
+    # render or edit the deck on a working copy. on a retry it starts from
+    # the last draft and gets the critic notes so it can fix the problems.
     req = state["request"]
-    citations = [{"chunk_id": cid, "doc": "", "loc": ""} for cid in plan["chunk_ids"][:2]]
+    intent = state["intent"]
+    retries = state.get("retries", 0) + 1
 
-    if state["intent"] == "evolve":
+    report = state.get("critic_report") or {}
+    issues = report.get("issues") if not report.get("passed", True) else None
+
+    if state.get("draft_deck"):
+        base = state["draft_deck"]
+    elif intent == "evolve":
         artifact = session.get(Artifact, req["artifact_id"])
         current = session.get(ArtifactVersion, artifact.current_version_id)
-        deck = dict(current.content)
-        slides = list(deck.get("slides", []))
-        slides.append({
-            "id": f"s{len(slides) + 1}",
-            "heading": f"Update: {req['text']}",
-            "bullets": ["(stub) this slide was added by the stub builder"],
-            "notes": "",
-            "provenance": "source",
-            "citations": citations,
-            "level": "standard",
-        })
-        deck["slides"] = slides
+        base = dict(current.content)
     else:
-        deck = {
-            "title": plan["topic"],
-            "slides": [
-                {
-                    "id": "s1",
-                    "heading": plan["topic"],
-                    "bullets": ["(stub) overview slide"],
-                    "notes": "",
-                    "provenance": "source",
-                    "citations": citations,
-                    "level": "intro",
-                },
-                {
-                    "id": "s2",
-                    "heading": "Key points",
-                    "bullets": ["(stub) point one", "(stub) point two"],
-                    "notes": "",
-                    "provenance": "source",
-                    "citations": citations,
-                    "level": "standard",
-                },
-            ],
-        }
-    return {"draft_deck": deck}
+        base = None
+
+    deck = run_builder(
+        session,
+        state["course_id"],
+        plan=state.get("plan_slice", {}),
+        chunks=state.get("retrieved_chunks", []),
+        base_deck=base,
+        instruction=req["text"],
+        intent=intent,
+        issues=issues,
+    )
+    return {"draft_deck": deck, "retries": retries}
 
 
 def critic(state: dict, session) -> dict:
-    # STUB critic. always passes for now. the real one checks grounding,
-    # labels, and level, and can send the builder back.
-    return {"critic_report": {"passed": True, "notes": "stub critic, always passes"}}
+    # check the draft against the source chunks. returns passed plus any
+    # problems for the builder to fix.
+    report = review(state.get("draft_deck", {}), state.get("retrieved_chunks", []))
+    return {"critic_report": report}
 
 
 def route_after_critic(state: dict) -> str:
-    # pass goes to finalize. a fail would go back to the builder, up to two
-    # retries, then finalize with whatever we have.
+    # pass goes to finalize. a fail goes back to the builder, until we hit
+    # the attempt cap, then we finalize with the best draft we have.
     report = state.get("critic_report", {})
     if report.get("passed"):
         return "finalize"
-    if state.get("retries", 0) >= 2:
+    if state.get("retries", 0) >= MAX_ATTEMPTS:
         return "finalize"
     return "builder"
 
@@ -127,12 +118,12 @@ def finalize(state: dict, session) -> dict:
     else:
         unit = StudyUnit(
             course_id=state["course_id"],
-            topic=state["plan_slice"]["topic"],
+            topic=deck.get("title", state["plan_slice"].get("topic", "Untitled")),
             lesson_plan=state["plan_slice"],
         )
         session.add(unit)
         session.commit()
-        artifact = Artifact(study_unit_id=unit.id, type="slides", title=state["plan_slice"]["topic"])
+        artifact = Artifact(study_unit_id=unit.id, type="slides", title=unit.topic)
         session.add(artifact)
         session.commit()
         version = ArtifactVersion(
@@ -164,3 +155,8 @@ def finalize(state: dict, session) -> dict:
         "version_number": version.version_number,
         "content": deck,
     }}
+
+
+def _learner_notes(session, course_id: str) -> str:
+    row = session.query(LearnerModel).filter(LearnerModel.course_id == course_id).first()
+    return row.notes if row and row.notes else ""

@@ -33,3 +33,22 @@ def chat_json(messages, model=None, **kwargs):
         **kwargs,
     )
     return json.loads(response.choices[0].message.content)
+
+
+def chat_tools(messages, tools, model=None, **kwargs):
+    # one step of a tool using loop. the model sees the tools and may reply
+    # with tool calls or with plain text. returns the raw message so the
+    # caller can run the tools and continue the loop.
+    #
+    # gpt-6-luna is a reasoning model. to use function tools on the chat
+    # completions endpoint it needs reasoning_effort set to none. callers can
+    # override this if we move to a model that wants something else.
+    kwargs.setdefault("reasoning_effort", "none")
+    response = _client.chat.completions.create(
+        model=model or settings.llm_model,
+        messages=messages,
+        tools=tools,
+        tool_choice="auto",
+        **kwargs,
+    )
+    return response.choices[0].message

@@ -19,6 +19,27 @@ SAMPLE_CHUNKS = 30
 COVERAGE_K = 5
 
 
+def plan_topic(topic: str, chunks: list[dict], learner_notes: str = "") -> dict:
+    # plan one lesson. decides the objective and the ordered points, and for
+    # each point whether it is covered by the sources or is supplementary.
+    # this is the substance. the builder renders it into slides.
+    joined = "\n\n".join(f"[{c['id']}] {c['text']}" for c in chunks) or "(no source chunks)"
+    messages = [
+        {"role": "system", "content": "You plan one lesson for a student from their material. Return JSON only."},
+        {"role": "user", "content": (
+            f"Topic: {topic}\n"
+            f"What we know about the learner: {learner_notes or 'nothing yet'}\n\n"
+            f"Source chunks (id in brackets):\n{joined}\n\n"
+            "Plan the lesson. Return JSON shaped like "
+            '{"topic": "a clean short title", "objective": "...", '
+            '"points": [{"point": "...", "provenance": "source", "chunk_ids": ["..."]}]}. '
+            "Use provenance 'source' for points the chunks cover and list the chunk ids. "
+            "Use 'supplementary' with an empty chunk_ids list for points you add from general knowledge."
+        )},
+    ]
+    return chat_json(messages)
+
+
 def survey_course(session: Session, course_id: str) -> dict:
     sample = _sample_chunks(session, course_id)
     if not sample:
