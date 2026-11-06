@@ -1,0 +1,22 @@
+# env files (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# node
+node_modules/
+dist/
+.vite/
+
+# os and editor
+.DS_Store
+.idea/
+.vscode/

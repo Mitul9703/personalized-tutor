@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg[binary]
+pgvector
+pydantic
+pydantic-settings
+openai
+sentence-transformers
+langgraph
+python-multipart
