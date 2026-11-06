@@ -14,6 +14,7 @@ def build_graph(session):
 
     graph.add_node("router", lambda s: nodes.router(s, session))
     graph.add_node("respond", lambda s: nodes.respond(s, session))
+    graph.add_node("revert", lambda s: nodes.revert(s, session))
     graph.add_node("planner", lambda s: nodes.planner(s, session))
     graph.add_node("builder", lambda s: nodes.builder(s, session))
     graph.add_node("critic", lambda s: nodes.critic(s, session))
@@ -23,7 +24,7 @@ def build_graph(session):
     graph.add_conditional_edges(
         "router",
         nodes.route_after_router,
-        {"planner": "planner", "respond": "respond"},
+        {"planner": "planner", "respond": "respond", "revert": "revert"},
     )
     graph.add_edge("planner", "builder")
     graph.add_edge("builder", "critic")
@@ -34,5 +35,6 @@ def build_graph(session):
     )
     graph.add_edge("finalize", END)
     graph.add_edge("respond", END)
+    graph.add_edge("revert", END)
 
     return graph.compile()

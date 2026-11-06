@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.store.db import get_session
 from app.store.models import Artifact, ArtifactVersion
+from app.store.versioning import revert_to
 
 router = APIRouter()
 
@@ -52,4 +53,21 @@ def get_version(artifact_id: str, version_id: str, session: Session = Depends(ge
         "parent_version_id": version.parent_version_id,
         "caused_by": version.caused_by,
         "deck": version.content,
+    }
+
+
+@router.post("/artifacts/{artifact_id}/revert/{version_id}")
+def revert_version(artifact_id: str, version_id: str, session: Session = Depends(get_session)):
+    # the version bar button in the UI uses this. the chat path ("undo")
+    # goes through the Router instead.
+    artifact = session.get(Artifact, artifact_id)
+    target = session.get(ArtifactVersion, version_id)
+    if artifact is None or target is None or target.artifact_id != artifact_id:
+        raise HTTPException(status_code=404, detail="artifact or version not found")
+    new_version = revert_to(session, artifact, target)
+    return {
+        "artifact_id": artifact.id,
+        "version_id": new_version.id,
+        "version_number": new_version.version_number,
+        "deck": new_version.content,
     }

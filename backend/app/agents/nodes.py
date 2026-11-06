@@ -8,6 +8,7 @@ from app.agents.planner import plan_topic
 from app.agents.builder import run_builder
 from app.agents.critic import review
 from app.agents.memory import update_notes
+from app.store.versioning import revert_to
 from app.store.models import StudyUnit, Artifact, ArtifactVersion, Message, LearnerModel, Chunk
 
 MAX_ATTEMPTS = 3
@@ -25,10 +26,49 @@ def router(state: dict, session) -> dict:
 
 
 def route_after_router(state: dict) -> str:
-    # answer and clarify turns skip the build pipeline.
-    if state.get("intent") in ("answer", "clarify"):
+    # answer and clarify turns reply with no deck; revert goes to its own
+    # node; everything else runs the build pipeline.
+    intent = state.get("intent")
+    if intent in ("answer", "clarify"):
         return "respond"
+    if intent == "revert":
+        return "revert"
     return "planner"
+
+
+def revert(state: dict, session) -> dict:
+    # go back to an earlier version. the router already decided which one.
+    # if it did not name a version, treat it as "undo" and use the parent of
+    # the current version.
+    artifact = session.get(Artifact, _artifact_id(state))
+    target = state.get("target", {})
+
+    target_version = None
+    if target.get("version_id"):
+        target_version = session.get(ArtifactVersion, target["version_id"])
+    if target_version is None:
+        current = session.get(ArtifactVersion, artifact.current_version_id)
+        target_version = (
+            session.get(ArtifactVersion, current.parent_version_id)
+            if current.parent_version_id else current
+        )
+
+    new_version = revert_to(session, artifact, target_version)
+    session.add(Message(
+        course_id=state["course_id"],
+        role="system",
+        text=f"Reverted {artifact.title} to v{target_version.version_number}",
+        related_artifact_id=artifact.id,
+        related_version_id=new_version.id,
+    ))
+    session.commit()
+
+    return {"final_version": {
+        "artifact_id": artifact.id,
+        "version_id": new_version.id,
+        "version_number": new_version.version_number,
+        "content": new_version.content,
+    }}
 
 
 def respond(state: dict, session) -> dict:

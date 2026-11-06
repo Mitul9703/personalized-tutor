@@ -134,7 +134,11 @@ def run_builder(session, course_id, *, plan, chunks, base_deck, instruction, int
         "You build and edit a slide deck for a student using the tools. "
         "Ground slides in the source chunks and cite their chunk_id. "
         "Mark anything beyond the sources as provenance 'supplementary' with no citation. "
-        "Keep slides short and clear. Call finish when the deck is ready."
+        "Keep slides short and clear. "
+        "When editing an existing deck, make the smallest change that satisfies the request: "
+        "touch only the slides the request is about and leave every other slide exactly as it is. "
+        "Do not reword or re-simplify slides you were not asked about. "
+        "Call finish when the deck is ready."
     )
     user = _compose_task(plan, chunks, deck, instruction, intent, issues)
     run_agent(system, user, TOOLS, handlers, max_steps=MAX_STEPS)
@@ -150,7 +154,11 @@ def _compose_task(plan, chunks, deck, instruction, intent, issues):
         parts.append("Here is the current deck as JSON:")
         parts.append(json.dumps(deck))
         parts.append(f"\nThe learner asked: {instruction}")
-        parts.append("Edit the deck with the surgical tools to satisfy the request.")
+        parts.append(
+            "Edit with the surgical tools (update_slide, add_slide, delete_slide, reorder_slides). "
+            "Do not call set_deck for an edit. Change only the slide or slides the request is about, "
+            "and leave all the other slides exactly as they are, word for word."
+        )
     else:
         parts.append(f"Build a slide deck for the topic: {plan.get('topic', instruction)}")
         if plan.get("objective"):

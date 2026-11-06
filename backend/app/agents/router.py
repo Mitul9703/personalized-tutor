@@ -2,8 +2,9 @@
 # It is a classifier, not a dispatcher: it does not call other agents, it
 # just writes its decision (intent and target). The graph routes on that.
 #
-# It has a list_decks tool so it can look up existing decks and resolve a
-# reference like "the momentum slide" or "slide 3" on its own.
+# It has tools to look things up so it can resolve a reference on its own:
+# list_decks to find which deck, and list_versions to find which version to
+# revert to when the learner says "undo" or "go back".
 
 from app.agents.agent_loop import run_agent
 from app.store.models import Artifact, StudyUnit, ArtifactVersion
@@ -11,8 +12,17 @@ from app.store.models import Artifact, StudyUnit, ArtifactVersion
 TOOLS = [
     {"type": "function", "function": {
         "name": "list_decks",
-        "description": "List the decks that already exist in this course, with their slide headings.",
+        "description": "List the decks in this course, with their slide headings.",
         "parameters": {"type": "object", "properties": {}},
+    }},
+    {"type": "function", "function": {
+        "name": "list_versions",
+        "description": "List the version history of a deck, newest last, with what caused each version.",
+        "parameters": {
+            "type": "object",
+            "properties": {"artifact_id": {"type": "string"}},
+            "required": ["artifact_id"],
+        },
     }},
     {"type": "function", "function": {
         "name": "finish",
@@ -22,14 +32,15 @@ TOOLS = [
             "properties": {
                 "intent": {
                     "type": "string",
-                    "enum": ["new_topic", "evolve", "answer", "clarify"],
+                    "enum": ["new_topic", "evolve", "revert", "answer", "clarify"],
                 },
                 "target": {
                     "type": "object",
-                    "description": "For evolve: artifact_id and slide_ids. For new_topic: topic.",
+                    "description": "For evolve: artifact_id and slide_ids. For revert: artifact_id and version_id. For new_topic: topic.",
                     "properties": {
                         "artifact_id": {"type": "string"},
                         "slide_ids": {"type": "array", "items": {"type": "string"}},
+                        "version_id": {"type": "string"},
                         "span": {"type": "string"},
                         "topic": {"type": "string"},
                     },
@@ -63,22 +74,34 @@ def route(session, course_id, request):
             decks.append({"artifact_id": art.id, "title": art.title, "slide_headings": headings})
         return {"decks": decks}
 
+    def list_versions(args):
+        rows = (
+            session.query(ArtifactVersion)
+            .filter(ArtifactVersion.artifact_id == args.get("artifact_id"))
+            .order_by(ArtifactVersion.version_number)
+            .all()
+        )
+        return {"versions": [
+            {"version_id": v.id, "version_number": v.version_number, "caused_by": v.caused_by}
+            for v in rows
+        ]}
+
     system = (
         "You decide what a student wants from one chat message in a learning app. "
-        "Choose one intent: new_topic (teach something new), evolve (change an existing deck, "
-        "for example explain deeper, simplify, add an example, edit), answer (a plain question you "
-        "can answer in chat with no deck), or clarify (the request is unclear, ask one short question). "
-        "Use list_decks if you need to resolve which deck or slide the student means. "
-        "Then call finish with the intent and target."
+        "Choose one intent: new_topic (teach something new), evolve (change an existing deck, for "
+        "example explain deeper, simplify, add an example, reorder, edit), revert (undo or go back to "
+        "an earlier version of a deck), answer (a plain question you can answer in chat with no deck), "
+        "or clarify (the request is unclear, ask one short question). "
+        "Use list_decks to find which deck the student means, and list_versions to pick which version "
+        "to revert to. For revert, put the chosen version_id in target. Then call finish."
     )
     user = (
         f"Student message: {request.get('text')}\n"
         f"Focused deck id, if the UI set one: {request.get('artifact_id')}\n"
         f"Focused slides, if any: {request.get('target_slide_ids')}\n"
     )
-    result = run_agent(system, user, TOOLS, {"list_decks": list_decks}, max_steps=4)
+    result = run_agent(system, user, TOOLS, {"list_decks": list_decks, "list_versions": list_versions}, max_steps=5)
 
-    # safety fallback if the model stopped without a clean decision
     if "intent" not in result:
         result = {"intent": "evolve" if request.get("artifact_id") else "new_topic", "target": {}}
     result.setdefault("target", {})
