@@ -8,7 +8,8 @@ from typing import TypedDict
 class TurnState(TypedDict, total=False):
     course_id: str
     learner_model: dict
-    request: dict          # text, target_artifact_id, target_slide_ids, intent
+    request: dict          # text, artifact_id, target_slide_ids
+    intent: str            # new_topic or evolve, set by the orchestrator
     retrieved_chunks: list
     plan_slice: dict
     draft_deck: dict       # the working copy

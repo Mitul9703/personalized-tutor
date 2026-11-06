@@ -1,10 +1,10 @@
 # The FastAPI app. Wires up the routers and a health check. More routers
-# (chat, artifacts) get added in later phases.
+# get added as we build.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import courses, documents
+from app.api import courses, documents, messages, artifacts
 
 app = FastAPI(title="Personalized Tutor API")
 
@@ -18,6 +18,8 @@ app.add_middleware(
 
 app.include_router(courses.router)
 app.include_router(documents.router)
+app.include_router(messages.router)
+app.include_router(artifacts.router)
 
 
 @app.get("/health")
