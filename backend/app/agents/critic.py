@@ -57,11 +57,15 @@ def review(session, course_id, deck: dict) -> dict:
         return {"chunks": [{"chunk_id": r.id, "text": r.text[:500]} for r in rows]}
 
     system = (
-        "You review a slide deck for a student. Check that each slide marked 'source' is supported by "
-        "the chunks it cites and actually cites at least one chunk, that each 'supplementary' slide does "
-        "not contradict the material, and that the slides are clear. Use retrieve to pull a chunk's text "
-        "or to search for supporting or contradicting material when you need to. Fail only for a real "
-        "grounding problem, not small style points. Call finish with the result."
+        "You review a slide deck for a student. For every slide marked 'source': it must cite at least "
+        "one chunk, and every claim in its heading and bullets must be supported by the chunks it cites. "
+        "Watch for mixed slides: if a 'source' slide puts a supported claim next to a claim the cited "
+        "chunks do not support, that is a grounding problem even when the extra claim is true general "
+        "knowledge. Fail it and say to either move the unsupported claim onto a 'supplementary' slide or "
+        "cite a chunk that actually supports it. Each 'supplementary' slide must not contradict the "
+        "material. Use retrieve to pull a cited chunk's text or to search for supporting or contradicting "
+        "material when you need to. Fail only for a real grounding problem, not small style points. "
+        "Call finish with the result."
     )
     user = "Slides to review:\n" + json.dumps(slides_view)
     result = run_agent(system, user, TOOLS, {"retrieve": retrieve_tool}, max_steps=6)
