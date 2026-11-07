@@ -19,6 +19,27 @@ class PostMessage(BaseModel):
     target_slide_ids: list[str] | None = None
 
 
+@router.get("/courses/{course_id}/messages")
+def list_messages(course_id: str, session: Session = Depends(get_session)):
+    # chat history, so the UI can reload a session.
+    rows = (
+        session.query(Message)
+        .filter(Message.course_id == course_id)
+        .order_by(Message.created_at)
+        .all()
+    )
+    return [
+        {
+            "id": m.id,
+            "role": m.role,
+            "text": m.text,
+            "artifact_id": m.related_artifact_id,
+            "version_id": m.related_version_id,
+        }
+        for m in rows
+    ]
+
+
 @router.post("/courses/{course_id}/messages")
 def post_message(course_id: str, body: PostMessage, session: Session = Depends(get_session)):
     course = session.get(Course, course_id)

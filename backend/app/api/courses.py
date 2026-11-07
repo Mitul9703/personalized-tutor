@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.store.db import get_session
-from app.store.models import Learner, Course, LearnerModel, CourseOutline
+from app.store.models import Learner, Course, LearnerModel, CourseOutline, Artifact, StudyUnit
 from app.agents.planner import survey_course
 
 router = APIRouter()
@@ -56,6 +56,22 @@ def run_survey(course_id: str, session: Session = Depends(get_session)):
     if not outline:
         raise HTTPException(status_code=400, detail="no material to survey yet")
     return outline
+
+
+@router.get("/courses/{course_id}/artifacts")
+def list_artifacts(course_id: str, session: Session = Depends(get_session)):
+    # the decks that exist in this course, for the UI to list and switch.
+    rows = (
+        session.query(Artifact)
+        .join(StudyUnit, Artifact.study_unit_id == StudyUnit.id)
+        .filter(StudyUnit.course_id == course_id)
+        .order_by(Artifact.created_at)
+        .all()
+    )
+    return [
+        {"artifact_id": a.id, "title": a.title, "current_version_id": a.current_version_id}
+        for a in rows
+    ]
 
 
 @router.get("/courses/{course_id}/outline")

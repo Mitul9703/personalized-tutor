@@ -8,10 +8,11 @@ from app.api import courses, documents, messages, artifacts
 
 app = FastAPI(title="Personalized Tutor API")
 
-# allow the frontend dev server to call the api during development
+# allow the frontend dev server to call the api during development. we match
+# any localhost port because Vite may shift ports if 5173 is taken.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origin_regex=r"http://localhost:\d+",
     allow_methods=["*"],
     allow_headers=["*"],
 )

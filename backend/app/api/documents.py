@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.store.db import get_session
-from app.store.models import Course, Document
+from app.store.models import Course, Document, Chunk
 from app.ingest.pipeline import ingest_document
 from app.ingest.retrieve import retrieve
 
@@ -38,6 +38,15 @@ def upload_document(
 
     count = ingest_document(session, document, path)
     return {"document_id": document.id, "status": document.status, "chunks": count}
+
+
+@router.get("/chunks/{chunk_id}")
+def get_chunk(chunk_id: str, session: Session = Depends(get_session)):
+    # lets a citation show the exact source text it points at.
+    chunk = session.get(Chunk, chunk_id)
+    if chunk is None:
+        raise HTTPException(status_code=404, detail="chunk not found")
+    return {"chunk_id": chunk.id, "text": chunk.text, "location": chunk.location}
 
 
 @router.get("/courses/{course_id}/search")
