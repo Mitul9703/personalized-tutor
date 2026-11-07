@@ -1,6 +1,15 @@
 # private notes, not for the repo
 POST_M2_NOTES.md
 
+# demo sample material
+samples/
+
+# downloaded eval source documents (re-fetch with eval/download_data.py)
+eval/data/
+
+# generated eval output
+eval/results.json
+
 # env files (never commit secrets)
 .env
 .env.*
