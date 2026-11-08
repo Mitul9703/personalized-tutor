@@ -48,6 +48,10 @@ export interface TurnResponse {
   version_id?: string;
   version_number?: number;
   deck?: Deck;
+  // answer and clarify turns: one entry per [n] marker in reply. null means
+  // the cited id did not resolve to a chunk.
+  citations?: (Citation | null)[];
+  uses_general_knowledge?: boolean;
 }
 
 export interface ChatMessage {
@@ -55,6 +59,8 @@ export interface ChatMessage {
   role: "learner" | "system";
   text: string;
   artifactId?: string | null;
+  citations?: (Citation | null)[];
+  usesGeneralKnowledge?: boolean;
 }
 
 export interface OutlineTopic {

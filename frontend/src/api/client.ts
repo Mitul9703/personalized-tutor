@@ -1,5 +1,6 @@
 import type {
   ArtifactDetail,
+  Citation,
   Deck,
   DeckRef,
   Outline,
@@ -44,7 +45,14 @@ export const api = {
 
   listMessages: (courseId: string) =>
     fetch(`${BASE}/courses/${courseId}/messages`).then(
-      unwrap<Array<{ id: string; role: "learner" | "system"; text: string; artifact_id: string | null }>>
+      unwrap<Array<{
+        id: string;
+        role: "learner" | "system";
+        text: string;
+        artifact_id: string | null;
+        citations?: (Citation | null)[];
+        uses_general_knowledge?: boolean;
+      }>>
     ),
 
   listArtifacts: (courseId: string) =>
