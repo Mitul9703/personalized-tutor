@@ -1,7 +1,9 @@
-import { Layers, Maximize2, Minimize2, RotateCcw, X } from "lucide-react";
+import { Layers, ListChecks, Maximize2, Minimize2, RotateCcw, X } from "lucide-react";
 import { useStore } from "../store/useStore";
+import type { Quiz } from "../api/types";
 import { VersionBar } from "./VersionBar";
 import { SlideDeck } from "./SlideDeck";
+import { QuizView } from "./QuizView";
 
 export function ArtifactPanel() {
   const deck = useStore((s) => s.deck);
@@ -14,8 +16,11 @@ export function ArtifactPanel() {
   const decks = useStore((s) => s.decks);
   const selectDeck = useStore((s) => s.selectDeck);
   const activeArtifactId = useStore((s) => s.activeArtifactId);
+  const createQuiz = useStore((s) => s.createQuiz);
+  const busy = useStore((s) => s.busy);
 
   if (!deck) return null;
+  const isQuiz = detail?.type === "quiz";
   const viewingNumber =
     viewing && detail ? detail.versions.find((v) => v.version_id === viewing)?.version_number : null;
 
@@ -37,6 +42,18 @@ export function ArtifactPanel() {
               </option>
             ))}
           </select>
+        )}
+
+        {!isQuiz && (
+          <button
+            onClick={() => createQuiz(deck.title)}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-brand hover:bg-brandsoft disabled:opacity-40"
+            title="Make a graded quiz on this topic"
+          >
+            <ListChecks className="h-3.5 w-3.5" />
+            Quiz me
+          </button>
         )}
 
         <button
@@ -77,7 +94,15 @@ export function ArtifactPanel() {
       )}
 
       <div className="min-h-0 flex-1">
-        <SlideDeck deck={deck} readOnly={!!viewing} />
+        {isQuiz && activeArtifactId ? (
+          <QuizView
+            quiz={deck as unknown as Quiz}
+            artifactId={activeArtifactId}
+            versionId={viewing ?? detail?.current_version_id ?? null}
+          />
+        ) : (
+          <SlideDeck deck={deck} readOnly={!!viewing} />
+        )}
       </div>
     </div>
   );
