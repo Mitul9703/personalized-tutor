@@ -35,6 +35,12 @@ function systemLine(res: TurnResponse): string {
   return `Updated "${title}".`;
 }
 
+async function fetchDeck(artifactId: string) {
+  const detail = await api.getArtifact(artifactId);
+  const version = await api.getVersion(artifactId, detail.current_version_id);
+  return { activeArtifactId: artifactId, artifactDetail: detail, deck: version.deck };
+}
+
 interface State {
   phase: Phase;
   ingestMsg: string;
@@ -130,7 +136,10 @@ export const useStore = create<State>((set, get) => ({
       }
       if (!progress.uploaded) {
         set({ ingestMsg: "Reading and indexing your material…" });
-        await api.uploadDocument(courseId, file);
+        const upload = await api.uploadDocument(courseId, file);
+        if (upload.status !== "ready" || !(upload.chunks > 0)) {
+          throw new Error("This file could not be processed into study material. Retry setup or choose another PDF or text file.");
+        }
         progress = { ...progress, uploaded: true };
         set({ setupProgress: progress });
       }
@@ -214,10 +223,14 @@ export const useStore = create<State>((set, get) => ({
         text: m.text,
         artifactId: m.artifact_id,
       }));
-      set({ outline, decks, messages, phase: "ready", courseTitle: course.title });
-      if (decks.length > 0) {
-        await get().selectDeck(decks[decks.length - 1].artifact_id);
-      }
+      const initialDeck = decks.length > 0 ? await fetchDeck(decks[decks.length - 1].artifact_id) : null;
+      if (get().courseId !== courseId || sequence !== courseLoadSequence) return;
+      set({
+        outline, decks, messages, courseTitle: course.title,
+        ...(initialDeck ?? {}),
+        panelMode: initialDeck ? "split" : "closed",
+        phase: "ready",
+      });
     } catch (e) {
       if (get().courseId === courseId && sequence === courseLoadSequence) set({ phase: "upload", error: String(e) });
     }
@@ -258,9 +271,8 @@ export const useStore = create<State>((set, get) => ({
   },
 
   selectDeck: async (artifactId) => {
-    const detail = await api.getArtifact(artifactId);
-    const v = await api.getVersion(artifactId, detail.current_version_id);
-    set({ activeArtifactId: artifactId, artifactDetail: detail, deck: v.deck, viewingVersionId: null, panelMode: "split", focusedSlideId: null });
+    const snapshot = await fetchDeck(artifactId);
+    set({ ...snapshot, viewingVersionId: null, panelMode: "split", focusedSlideId: null });
   },
 
   selectVersion: async (versionId) => {

@@ -66,45 +66,44 @@ export function UploadScreen() {
               </div>
               <Button variant="ghost" onClick={() => setEditing(true)}>Edit profile</Button>
             </div>
-            {selectedFile && error ? (
+            {selectedFile && error && (
               <div className="mt-6 space-y-3">
                 <p className="text-sm text-ink/60">Continue setting up {selectedFile.name}.</p>
                 <Button onClick={() => pick(selectedFile)}>Retry setup</Button>
               </div>
-            ) : (
-              <label
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDrag(true);
-                }}
-                onDragLeave={() => setDrag(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDrag(false);
-                  pick(e.dataTransfer.files?.[0]);
-                }}
-                htmlFor="course-material"
-                className={cn(
-                  "mt-8 flex cursor-pointer flex-col items-center gap-3 rounded-2xl border-2 border-dashed p-10 transition focus-within:ring-2 focus-within:ring-brand",
-                  drag ? "border-brand bg-brandsoft" : "border-line bg-panel hover:border-brand/50"
-                )}
-              >
-                <UploadCloud className={cn("h-8 w-8", drag ? "text-brand" : "text-ink/40")} />
-                <div className="text-sm">
-                  <span className="font-medium text-brand">Choose a file</span>
-                  <span className="text-ink/50"> or drop it here</span>
-                </div>
-                <div className="text-xs text-ink/40">PDF or text</div>
-                <input
-                  id="course-material"
-                  ref={inputRef}
-                  type="file"
-                  accept=".pdf,.txt,.md,text/plain,application/pdf"
-                  className="sr-only"
-                  onChange={(e) => pick(e.target.files?.[0])}
-                />
-              </label>
             )}
+            <label
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDrag(true);
+              }}
+              onDragLeave={() => setDrag(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDrag(false);
+                pick(e.dataTransfer.files?.[0]);
+              }}
+              htmlFor="course-material"
+              className={cn(
+                "mt-8 flex cursor-pointer flex-col items-center gap-3 rounded-2xl border-2 border-dashed p-10 transition focus-within:ring-2 focus-within:ring-brand",
+                drag ? "border-brand bg-brandsoft" : "border-line bg-panel hover:border-brand/50"
+              )}
+            >
+              <UploadCloud className={cn("h-8 w-8", drag ? "text-brand" : "text-ink/40")} />
+              <div className="text-sm">
+                <span className="font-medium text-brand">{selectedFile && error ? "Choose another file" : "Choose a file"}</span>
+                <span className="text-ink/50"> or drop it here</span>
+              </div>
+              <div className="text-xs text-ink/40">PDF or text</div>
+              <input
+                id="course-material"
+                ref={inputRef}
+                type="file"
+                accept=".pdf,.txt,.md,text/plain,application/pdf"
+                className="sr-only"
+                onChange={(e) => pick(e.target.files?.[0])}
+              />
+            </label>
           </>
         )}
 
