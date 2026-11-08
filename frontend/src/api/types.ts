@@ -1,3 +1,14 @@
+export interface LearnerProfile {
+  level: "beginner" | "intermediate" | "advanced";
+  goal: string;
+  background: string;
+}
+
+export interface OnboardingResponse {
+  course_id: string;
+  profile: LearnerProfile | null;
+}
+
 export interface Citation {
   chunk_id: string;
   doc?: string;
