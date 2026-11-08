@@ -11,6 +11,8 @@ class TurnState(TypedDict, total=False):
     intent: str            # new_topic, evolve, answer, or clarify
     target: dict           # artifact_id, slide_ids, topic, set by the router
     response: str          # reply text for answer or clarify turns
+    answer_citations: list # {chunk_id, doc, loc} per [n] marker in response
+    uses_general_knowledge: bool  # the reply goes beyond the material
     retrieved_chunks: list
     plan_slice: dict
     draft_deck: dict       # the working copy
