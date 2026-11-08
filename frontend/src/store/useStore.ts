@@ -51,6 +51,8 @@ interface State {
   restoreVersion: (versionId: string) => Promise<void>;
   focusSlide: (slideId: string | null) => void;
   setPanelMode: (mode: PanelMode) => void;
+  createFlashcards: (topic: string) => Promise<void>;
+  editFlashcards: (instruction: string) => Promise<void>;
   refreshDecks: () => Promise<void>;
   dismissError: () => void;
 }
@@ -188,6 +190,64 @@ export const useStore = create<State>((set, get) => ({
 
   focusSlide: (slideId) => set({ focusedSlideId: slideId }),
   setPanelMode: (mode) => set({ panelMode: mode }),
+  createFlashcards: async (topic) => {
+    const { courseId } = get();
+    if (!courseId || !topic.trim()) return;
+    set((s) => ({
+      messages: [...s.messages, { id: rid(), role: "learner", text: `Make flashcards about ${topic}` }],
+      busy: true,
+      error: null,
+    }));
+    try {
+      const res = await api.createFlashcards(courseId, topic);
+      const detail = await api.getArtifact(res.artifact_id);
+      set((s) => ({
+        messages: [
+          ...s.messages,
+          { id: rid(), role: "system", text: `Created flashcards "${res.content.title}".`, artifactId: res.artifact_id },
+        ],
+        activeArtifactId: res.artifact_id,
+        // the panel holds the current artifact's content here and switches on artifactDetail.type
+        deck: res.content as unknown as Deck,
+        artifactDetail: detail,
+        viewingVersionId: null,
+        panelMode: s.panelMode === "closed" ? "split" : s.panelMode,
+      }));
+      await get().refreshDecks();
+    } catch (e) {
+      set({ error: String(e) });
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  editFlashcards: async (instruction) => {
+    const { activeArtifactId } = get();
+    if (!activeArtifactId || !instruction.trim()) return;
+    set((s) => ({
+      messages: [...s.messages, { id: rid(), role: "learner", text: instruction }],
+      busy: true,
+      error: null,
+    }));
+    try {
+      const res = await api.editFlashcards(activeArtifactId, instruction);
+      const detail = await api.getArtifact(activeArtifactId);
+      set((s) => ({
+        messages: [
+          ...s.messages,
+          { id: rid(), role: "system", text: `Updated flashcards "${res.content.title}".`, artifactId: activeArtifactId },
+        ],
+        deck: res.content as unknown as Deck,
+        artifactDetail: detail,
+        viewingVersionId: null,
+      }));
+    } catch (e) {
+      set({ error: String(e) });
+    } finally {
+      set({ busy: false });
+    }
+  },
+
   refreshDecks: async () => {
     const { courseId } = get();
     if (!courseId) return;

@@ -2,6 +2,7 @@ import type {
   ArtifactDetail,
   Deck,
   DeckRef,
+  FlashcardResponse,
   Outline,
   TurnResponse,
 } from "./types";
@@ -56,6 +57,20 @@ export const api = {
       headers: JSON_HEADERS,
       body: JSON.stringify({ text, artifact_id: artifactId ?? null }),
     }).then(unwrap<TurnResponse>),
+
+  createFlashcards: (courseId: string, topic: string) =>
+    fetch(`${BASE}/courses/${courseId}/flashcards`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ topic }),
+    }).then(unwrap<FlashcardResponse>),
+
+  editFlashcards: (artifactId: string, instruction: string) =>
+    fetch(`${BASE}/artifacts/${artifactId}/flashcards/edit`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ instruction }),
+    }).then(unwrap<FlashcardResponse>),
 
   getChunk: (chunkId: string) =>
     fetch(`${BASE}/chunks/${chunkId}`).then(

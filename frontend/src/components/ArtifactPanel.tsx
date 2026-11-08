@@ -1,7 +1,9 @@
-import { Layers, Maximize2, Minimize2, RotateCcw, X } from "lucide-react";
+import { Layers, Layers3, Maximize2, Minimize2, RotateCcw, X } from "lucide-react";
 import { useStore } from "../store/useStore";
 import { VersionBar } from "./VersionBar";
 import { SlideDeck } from "./SlideDeck";
+import { FlashcardDeck } from "./FlashcardDeck";
+import type { FlashcardSet } from "../api/types";
 
 export function ArtifactPanel() {
   const deck = useStore((s) => s.deck);
@@ -14,8 +16,11 @@ export function ArtifactPanel() {
   const decks = useStore((s) => s.decks);
   const selectDeck = useStore((s) => s.selectDeck);
   const activeArtifactId = useStore((s) => s.activeArtifactId);
+  const createFlashcards = useStore((s) => s.createFlashcards);
+  const busy = useStore((s) => s.busy);
 
   if (!deck) return null;
+  const isFlashcards = detail?.type === "flashcards";
   const viewingNumber =
     viewing && detail ? detail.versions.find((v) => v.version_id === viewing)?.version_number : null;
 
@@ -37,6 +42,18 @@ export function ArtifactPanel() {
               </option>
             ))}
           </select>
+        )}
+
+        {!isFlashcards && (
+          <button
+            onClick={() => createFlashcards(deck.title)}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-brand hover:bg-brandsoft disabled:opacity-40"
+            title="Make flashcards on this topic"
+          >
+            <Layers3 className="h-3.5 w-3.5" />
+            Flashcards
+          </button>
         )}
 
         <button
@@ -77,7 +94,11 @@ export function ArtifactPanel() {
       )}
 
       <div className="min-h-0 flex-1">
-        <SlideDeck deck={deck} readOnly={!!viewing} />
+        {isFlashcards ? (
+          <FlashcardDeck set={deck as unknown as FlashcardSet} readOnly={!!viewing} />
+        ) : (
+          <SlideDeck deck={deck} readOnly={!!viewing} />
+        )}
       </div>
     </div>
   );
