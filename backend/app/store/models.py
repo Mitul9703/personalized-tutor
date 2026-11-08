@@ -139,4 +139,6 @@ class Message(Base):
     text: Mapped[str] = mapped_column(Text)
     related_artifact_id: Mapped[str] = mapped_column(String, nullable=True)
     related_version_id: Mapped[str] = mapped_column(String, nullable=True)
+    # for chat answers: {"items": [{chunk_id, doc, loc}], "uses_general_knowledge": bool}
+    citations: Mapped[dict] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
