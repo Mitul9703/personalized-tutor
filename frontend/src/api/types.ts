@@ -70,6 +70,47 @@ export interface OutlineTopic {
   chunk_ids?: string[];
 }
 
+export interface QuizQuestion {
+  id: string;
+  kind: "mcq" | "open";
+  stem: string;
+  options: string[];
+  answer: string;
+  explanation: string;
+  provenance: "source" | "supplementary";
+  citations: Citation[];
+}
+
+export interface Quiz {
+  title: string;
+  questions: QuizQuestion[];
+}
+
+export interface Grade {
+  question_id: string;
+  verdict: "right" | "partial" | "wrong" | "ungraded";
+  feedback: string;
+  provenance: "source" | "supplementary";
+  citations: Citation[];
+  misconception: string;
+}
+
+export interface QuizResult {
+  artifact_id: string;
+  version_id: string;
+  score: number;
+  total: number;
+  grades: Grade[];
+}
+
+export interface CreateQuizResponse {
+  type: "quiz";
+  artifact_id: string;
+  version_id: string;
+  version_number: number;
+  content: Quiz;
+}
+
 export interface Outline {
   topics: OutlineTopic[];
   coverage?: Record<string, unknown>;

@@ -1,9 +1,11 @@
 import type {
   ArtifactDetail,
   Citation,
+  CreateQuizResponse,
   Deck,
   DeckRef,
   Outline,
+  QuizResult,
   TurnResponse,
 } from "./types";
 
@@ -82,4 +84,18 @@ export const api = {
     fetch(`${BASE}/artifacts/${artifactId}/revert/${versionId}`, {
       method: "POST",
     }).then(unwrap<{ artifact_id: string; version_id: string; version_number: number; deck: Deck }>),
+
+  createQuiz: (courseId: string, topic: string) =>
+    fetch(`${BASE}/courses/${courseId}/quizzes`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ topic }),
+    }).then(unwrap<CreateQuizResponse>),
+
+  submitQuiz: (artifactId: string, answers: Record<string, string>, versionId?: string | null) =>
+    fetch(`${BASE}/artifacts/${artifactId}/quiz/submit`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ answers, version_id: versionId ?? null }),
+    }).then(unwrap<QuizResult>),
 };
