@@ -3,12 +3,13 @@
 # their uploaded material.
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 from app.store.db import get_session
 from app.store.models import Learner, Course, LearnerModel, CourseOutline, Artifact, StudyUnit
 from app.agents.planner import survey_course
+from app.schemas.learner import LearnerProfile, OnboardingResponse
 
 router = APIRouter()
 
@@ -19,8 +20,7 @@ class CreateCourse(BaseModel):
 
 @router.post("/courses")
 def create_course(body: CreateCourse, session: Session = Depends(get_session)):
-    # for now we make a fresh learner per course. onboarding fills in the
-    # profile in a later phase.
+    # The learner profile belongs to the course's LearnerModel.
     learner = Learner(profile={})
     session.add(learner)
     session.commit()
@@ -42,6 +42,43 @@ def get_course(course_id: str, session: Session = Depends(get_session)):
     if course is None:
         raise HTTPException(status_code=404, detail="course not found")
     return {"course_id": course.id, "title": course.title, "learner_id": course.learner_id}
+
+
+@router.get("/courses/{course_id}/onboarding", response_model=OnboardingResponse)
+def get_onboarding(course_id: str, session: Session = Depends(get_session)):
+    if session.get(Course, course_id) is None:
+        raise HTTPException(status_code=404, detail="course not found")
+    row = session.query(LearnerModel).filter(LearnerModel.course_id == course_id).first()
+    try:
+        profile = LearnerProfile.model_validate(row.profile if row else {})
+    except ValidationError:
+        profile = None
+    return OnboardingResponse(course_id=course_id, profile=profile)
+
+
+@router.post("/courses/{course_id}/onboarding", response_model=OnboardingResponse)
+def save_onboarding(body: LearnerProfile, course_id: str, session: Session = Depends(get_session)):
+    try:
+        # Serialize saves for this course, including creation of a missing model.
+        course = session.query(Course).filter(Course.id == course_id).with_for_update().first()
+        if course is None:
+            raise HTTPException(status_code=404, detail="course not found")
+        row = session.query(LearnerModel).filter(LearnerModel.course_id == course_id).first()
+        if row is None:
+            row = LearnerModel(course_id=course_id, profile={}, notes="")
+            session.add(row)
+        row.profile = {**(row.profile or {}), **body.model_dump()}
+        if not (row.notes or "").strip():
+            row.notes = (
+                f"Self-reported level: {body.level}.\n"
+                f"Learning goal: {body.goal}\n"
+                f"Background: {body.background}"
+            )
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    return OnboardingResponse(course_id=course_id, profile=body)
 
 
 @router.post("/courses/{course_id}/survey")

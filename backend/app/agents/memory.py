@@ -2,6 +2,8 @@
 # The model decides what is worth remembering, we just store what it writes.
 # The notes are read before planning so the system adapts to the learner.
 
+import json
+
 from app.llm.chat import chat
 from app.store.models import LearnerModel
 
@@ -16,9 +18,14 @@ def update_notes(session, course_id: str, turn_text: str, deck_title: str):
         {"role": "system", "content": (
             "You keep short running notes about a student, to help teach them better. "
             "Keep it to a few plain lines. Note what they are working on and anything about what they "
-            "find hard or easy, or how they like things explained. Return only the updated notes."
+            "find hard or easy, or how they like things explained. Preserve useful learning history. "
+            "The current structured profile is authoritative over conflicting older profile assertions: "
+            "remove outdated assertions while retaining observations about progress and difficulties. "
+            "Keep observed learning history distinct from self-reported background, and do not infer "
+            "progress merely from a profile edit. Return only the updated notes."
         )},
         {"role": "user", "content": (
+            f"Current learner profile (self-reported):\n{json.dumps(row.profile or {}, ensure_ascii=False)}\n\n"
             f"Current notes:\n{old}\n\n"
             f"This turn, the student asked: {turn_text}\n"
             f"The deck in play was: {deck_title}\n\n"
