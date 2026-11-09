@@ -22,8 +22,9 @@ export function SlideView({ slide, index, total, readOnly }: {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="mx-auto flex aspect-[16/10] w-full max-w-3xl flex-col rounded-2xl border border-line bg-panel p-8 shadow-sm"
+      className="mx-auto w-full max-w-3xl space-y-3"
     >
+      <div className="flex aspect-[16/10] w-full flex-col rounded-2xl border border-line bg-panel p-8 shadow-sm">
       <div className="mb-1 flex items-center justify-between text-xs text-ink/40">
         <span>
           Slide {index + 1} of {total}
@@ -40,7 +41,7 @@ export function SlideView({ slide, index, total, readOnly }: {
 
       <h2 className="mt-2 text-2xl font-semibold leading-tight">{slide.heading}</h2>
 
-      <ul className="mt-5 flex-1 space-y-3">
+      <ul className="mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto">
         {slide.bullets.map((b, i) => (
           <li key={i} className="flex gap-3 text-[15px] leading-relaxed text-ink/80">
             <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand/60" />
@@ -70,6 +71,15 @@ export function SlideView({ slide, index, total, readOnly }: {
           </button>
         )}
       </div>
+      </div>
+      {slide.notes?.trim() && (
+        <details className="group rounded-xl border border-line bg-panel/60 px-4 py-3">
+          <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-ink/50">
+            Go deeper
+          </summary>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink/70">{slide.notes}</p>
+        </details>
+      )}
     </motion.div>
   );
 }
