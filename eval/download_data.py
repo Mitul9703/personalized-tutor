@@ -14,6 +14,7 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 PUBLIC = os.path.join(HERE, "data", "public")
 ML = os.path.join(HERE, "data", "ml")
+LARGE = os.path.join(HERE, "data", "large")
 
 
 def _get(url: str) -> bytes:
@@ -96,6 +97,34 @@ def main():
     print("D3 novel (synthetic, written in novel_docs.py):")
     from novel_docs import write_novel
     write_novel()
+
+    print("D4 large (concatenated reader for the big-document task):")
+    write_large()
+
+
+def write_large():
+    # Build one big reader by concatenating the ML docs, with the Ruder survey
+    # (which covers Adam and other variants) placed LAST so its content sits
+    # past the single-call baseline's 150k-char cutoff. Our system and the RAG
+    # baseline retrieve, so they reach the tail; the single call truncates and
+    # loses it. That is the honest large-document condition.
+    order = [
+        "overfitting.txt", "backpropagation.txt", "support_vector_machine.txt",
+        "gradient_descent.txt", "cs229_supervised_learning.txt",
+        "ruder_gradient_descent_survey.txt",
+    ]
+    os.makedirs(LARGE, exist_ok=True)
+    parts = []
+    for name in order:
+        path = os.path.join(ML, name)
+        if os.path.exists(path):
+            with open(path, encoding="utf-8", errors="ignore") as f:
+                parts.append(f"\n\n===== SECTION: {name} =====\n\n" + f.read())
+    text = "".join(parts)
+    out = os.path.join(LARGE, "big_ml_reader.txt")
+    with open(out, "w", encoding="utf-8") as f:
+        f.write(text)
+    print(f"wrote {out} ({len(text)} chars)")
 
 
 if __name__ == "__main__":
