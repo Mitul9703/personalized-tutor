@@ -1,120 +1,161 @@
-# Evaluation (Milestone 2, Section 3)
+# Preliminary evaluation
 
-The goal of this project is learning, so the evaluation is built around
-learning, not around how polished a deck looks. We run our system and two
-baselines on the same inputs and the same model (gpt-6-luna), so any
-difference is architectural, not a model or luck difference. We report three
-headline qualities (does the student learn, is it personalized, can it be
-steered), two trust guardrails, and one agent-behavior check. Latency is a
-footnote.
-
-## The task
-
-Given a source document and a topic, produce a slide deck that teaches the
-topic. Every system gets the same document, topic, and model.
-
-## Baselines
-
-- **B1 single call.** The whole document in one prompt, no retrieval, no
-  critic, no learner model, no interaction. Truncates very long documents at
-  150k chars, which is the honest limit of "just paste the whole thing."
-  Isolates what our entire pipeline adds over prompting the model.
-- **B2 RAG + single generation.** Retrieve the most relevant chunks (same
-  local embedding model our system uses), then make the deck in one call. No
-  planner, no critic, no learner model, no interaction. The sharper
-  comparison: it isolates what our plan -> build -> critique loop adds over
-  plain retrieval plus one generation.
-- Instructional Agents (our given baseline) is deferred to the final
-  milestone; B1 and B2 are enough for the Section 3 comparison and B2 is the
-  more informative of the two for our thesis.
+This evaluates the current tutor and two one-call baselines on **two cases,
+six initial decks, and ten frozen questions**. It uses the existing runner,
+source utilities, and scoring helpers. Production code and interfaces are unchanged.
 
 ## Datasets
 
-Raw files are not committed. Regenerate with
-`backend/.venv/bin/python eval/download_data.py`.
+| Dataset | Selected source and task | Sample | Relevance |
+|---|---|---|---|
+| School | Siyavula Grade 9 Mathematics, Integers chapter: addition, subtraction, multiplication | 1 topic, 5 questions | Foundational explanations and worked examples |
+| College | Dive into Deep Learning: Adam, momentum, RMSProp | 1 topic, 5 questions | Technical explanations of uploaded college material |
 
-- **D1 public** (`data/public/`): Wikipedia (CC BY-SA) and OpenStax (CC BY).
-- **D2 ML/CS** (`data/ml/`): Wikipedia, arXiv 1609.04747 (Ruder), Stanford CS229.
-- **D3 novel** (`data/novel/`, written in `novel_docs.py`): short,
-  clearly-fictional topics with specific, unguessable facts. For the learning
-  metric only: on a famous topic the simulated student already knows the
-  answers, so no tutorial can show a gain (a ceiling we confirmed). On novel
-  material the only way to answer is if the tutorial taught it.
-- **D4 large** (`data/large/`): one ~165k-char reader built by concatenating
-  the ML docs, with the needle topic (Nadam) in the tail, past B1's 150k
-  cutoff. B1 truncates and cannot reach it; our system and B2 retrieve it.
-  This is the condition where retrieval is supposed to matter.
-- **D5 school** (`data/school/`): Grade 9 Mathematics from Siyavula (CC BY 3.0),
-  a real national-curriculum textbook (first ~110 pages). Dense with worked
-  examples and specific numbers, so comprehension questions must come from the
-  text rather than general knowledge. This is the school-level dataset.
-- **D6 college** (`data/college/`): the optimization chapter of Dive into Deep
-  Learning (CC BY-SA 4.0), pulled from the book's GitHub source. Real college
-  course material with specific update rules, learning rates, and worked
-  examples. This is the college-level dataset.
+These are public course-material collections and stakeholder-relevant proxies,
+not standardized benchmarks or stakeholder-provided datasets. Topics are the
+existing school/college entries in `tasks.py`.
 
-D5 and D6 are the two real course-material datasets the stakeholder asked for
-(one school, one college). They are deliberately rich in numbers and examples so
-the learning metric has signal instead of ceiling-ing out on a famous topic.
+`download_data.py --selected` downloads only these sources. School extraction
+uses PDF pages 33–44 (printed 27–38), with boundary checks, from
+[Siyavula](https://www.siyavula.com/downloads/books/maths/Gr9A_Mathematics_Learner_Eng.pdf)
+(CC BY 3.0). School original text size refers to the first 110 PDF pages; total
+PDF pages and file bytes are also recorded. College extraction reuses the existing
+cleaning of [Adam](https://raw.githubusercontent.com/d2l-ai/d2l-en/master/chapter_optimization/adam.md),
+momentum, and RMSProp (Dive into Deep Learning, Zhang et al., CC BY-SA 4.0).
+It removes code blocks and book markup and retains explanatory prose/formulas.
+Raw section sizes and hashes are recorded before cleaning.
 
-## Headline metrics (does the student learn?)
+Sources are frozen as complete paragraphs within 50,000 characters. Metadata
+includes URLs, retrieval dates, attribution, extraction boundaries, original,
+selected, and evaluated sizes, hashes, word counts, and application chunk counts.
+Five source-based questions/reference answers per case are independently checked
+for support and clarity before generation. A rejected assessment receives at
+most one recorded revision and revalidation; a second rejection blocks freezing.
+Both cases must be accepted before any evaluated generation. Questions and keys
+never enter generation prompts. No training/split; use the separate smoke fixture.
 
-- **Teaching effectiveness.** A simulated student reads ONLY the generated
-  tutorial (not the source), answers source-based questions, and is scored by
-  a judge against reference answers (correct 1, partial 0.5, else 0). A
-  **no-tutorial control** (same student, no tutorial) measures prior knowledge
-  so the lift is honest. This is the runnable proxy for the pre/post human
-  learning-gain study planned for the final milestone.
-- **Personalization fidelity.** Our system generates the same topic under a
-  beginner and an advanced learner profile (set in the learner model the
-  system actually reads); a judge rates whether the two lessons differ in the
-  right direction. The baselines have no learner model and cannot personalize.
-- **Interaction quality.** We generate a deck, then send steering commands
-  (explain deeper, simplify, add an example) and check whether each was
-  carried out and the result stayed grounded. The baselines produce a deck and
-  stop, so they score zero here by construction; we report it as a capability
-  our architecture has and they do not.
-- **Pedagogy (1-5).** A learning-science rubric: scaffolding, concreteness,
-  checks for understanding, cognitive load, clarity.
+## Systems and conditions
 
-## Guardrail metrics (is it trustworthy?)
+- **B1:** one generation call over all ingested chunks of the frozen source.
+- **B2:** application `retrieve` with k=8, then one generation call.
+- **Proposed:** existing message API, including its router, planner, builder,
+  critic, and memory behavior.
 
-- **Groundedness.** Of the slides marked "source", the fraction a judge finds
-  supported by the material. Supplementary slides are not penalized.
-- **Citation validity.** Of all citations, the fraction that resolve to a
-  real, retrievable chunk. Our citations resolve; the baselines produce none,
-  so they cannot be audited.
+All use the configured application model, matching beginner profile, topic,
+five-slide request, genuine chunk IDs, and opportunity to generate notes and
+citations. Notes are accessible through **Go deeper** and included in evaluation.
+B1/B2 use the existing JSON model wrapper with reasoning effort `none`, as do
+application tool calls. Other application settings and SDK defaults are unchanged.
+Agent limits: router 5, survey 8, planner 6, builder 10, critic 6, build attempts 3.
+Model/provider/endpoint host, embedding model, request, code hashes, and conditions
+are saved in the manifest. Code/settings changes require a new run ID.
 
-## Agent behavior
+Use one generation attempt per condition, 900-second HTTP timeout, and no
+evaluator generation retries. The application's internal retries remain enabled.
+Warm embeddings before timing; record setup (onboarding/upload/survey) separately.
+Fixed order is B1, B2, proposed; latency may reflect order/provider load.
 
-- **Planted-error catch rate.** We inject a plausible but false claim onto a
-  source slide and check that the Critic fails the deck. A **clean-pass rate**
-  (does the Critic pass the untouched deck) is the control: a Critic that fails
-  everything would catch errors trivially, so both numbers matter.
+## Metrics
 
-## Footnote
+| Metric | Procedure |
+|---|---|
+| Automated tutorial answerability | Answering model sees only lesson headings, bullets, notes, and questions. Grade against references: correct=1, partial=0.5, wrong/uncovered=0; average over five questions. |
+| No-tutorial control | Same questions answered from prior knowledge; report difference in percentage points descriptively. |
+| Instructional quality | Anonymous judge scores alignment, learner appropriateness, accuracy separately, each 1–5 with reasons. Paper anchors: 1 redevelopment, 3 moderate revisions, 5 minimal edits. Mean requires all three valid ratings. |
+| Groundedness | Source-labeled slides with all substantive claims supported / source-labeled slides. Supplementary fraction is recorded separately. |
+| Citation coverage | Source-labeled slides carrying citation entries / source-labeled slides. |
+| Citation validity | Entries resolving to chunks of this evaluated source / all entries; malformed entries count as invalid. Resolution alone does not prove semantic support. |
+| Completion | Valid, nonempty decks returned / attempted generations. Five slides are requested; actual slide count is reported. |
+| Latency | Elapsed generation time; setup/warmup excluded. |
 
-- **Latency.** Reported, not a goal. Our system is slower because it retrieves,
-  plans, builds, and criticizes; that cost buys the headline qualities.
+Judges use identical instructions across systems and receive no system labels.
+Denominators come from code. Unavailable/malformed scoring is N/A; independent
+valid metrics survive other scoring failures. No answer padding or silent score
+coercion. Failed generations receive zero end-to-end answerability and unavailable
+content-quality scores. Empty decks/chat-only responses remain explicit failures.
+Raw API replies/intents, parsed model responses, malformed JSON, and failures are saved.
 
-## How to run
+## Two college diagnostics
 
-Backend up (see backend/README.md), then:
+Reuse the proposed beginner deck. Generate one fresh advanced-profile lesson
+through normal onboarding, then judge appropriate adaptation in depth,
+terminology, prerequisites, mechanisms, and examples. Submit one edit to simplify
+slide 2 and add an example while preserving meaning and other slides. Judge actual
+fulfillment and meaning preservation; mechanically compare non-target slides.
+A missing revised deck is a failed edit, never a fallback to the previous deck.
+Baseline diagnostics are **not evaluated**. The comparison does not establish
+that baselines cannot personalize, revise, or cite.
 
+## Run
+
+From the repository root, start the existing database and create a dedicated
+application database once (do not reuse an existing measurement run's database):
+
+```sh
+docker compose up -d db
+docker compose exec db psql -U tutor -d postgres -c 'CREATE DATABASE tutor_small_eval'
+cd backend
+export DATABASE_URL=postgresql+psycopg://tutor:tutor@localhost:5432/tutor_small_eval
+export UPLOAD_DIR=../eval/data/small_api_uploads
+.venv/bin/python -m app.store.init_db
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8011
 ```
-cd backend && .venv/bin/python ../eval/run_eval.py [limit_per_dataset] [questions] [pers_per_dataset] [interaction_per_dataset]
+
+In another terminal, from `backend/` (so the existing `.env` is loaded):
+
+```sh
+export DATABASE_URL=postgresql+psycopg://tutor:tutor@localhost:5432/tutor_small_eval
+export TUTOR_DB="$DATABASE_URL"
+export TUTOR_API=http://127.0.0.1:8011
+export EVAL_DATASETS=school,college
+export EVAL_DIAGNOSTICS=college
+export EVAL_RUN_ID=school_college_v1
+.venv/bin/python ../eval/run_eval.py 1 5 1 1
 ```
 
-Example: `../eval/run_eval.py 1 5 1 1` runs one core task per dataset (five
-questions each), one personalization check per dataset, and one interaction
-check per dataset. Omit the limit to run everything. Results print as a table
-and save to `eval/results.json`.
+API and evaluator must share the same database. The runner rejects a conflicting
+`TUTOR_DB` alias and verifies that the API's uploaded document/profile/chunks are
+visible through its database connection. No direct learner-note writes.
 
-## Reading the results
+The positional arguments remain `[limit] [questions] [personalization] [interaction]`.
+This selected pilot requires `1 5`, and each diagnostic count is `0` or `1`.
+School/college are the only supported datasets for this preliminary runner.
+Optional `--prepare-only` freezes assessments without generating lessons;
+`--report-only` rebuilds the report offline. Use the same run ID/settings to resume:
+saved operations, including failures and interrupted requests, are never retried
+automatically. Start a new run ID for corrected measurements. A file lock prevents
+concurrent commands from duplicating operations.
 
-On famous topics the no-tutorial control is high, so teaching effectiveness
-cannot separate systems there; that is why D3 and D4 exist. On novel and large
-material the control drops and the differences are real. The honest frame: a
-single call is a strong content generator on short in-context documents, but
-it cannot personalize, cannot be steered, cannot be audited, and truncates
-large documents, which is where our architecture is designed to matter.
+Offline validation from the repository root:
+
+```sh
+backend/.venv/bin/python -m pytest -q eval/tests
+LLM_API_KEY=offline-smoke EVAL_RUN_ID=development_fixture backend/.venv/bin/python eval/run_eval.py --smoke
+```
+
+## Outputs and limitations
+
+`eval/data/runs/<run-id>/` contains `manifest.json`, `inputs.json`, frozen source
+files, incremental `results.json`, raw `calls.jsonl`, and `report.md`. Generated
+data stays under the repository's existing ignored data area. Reporting requires
+no new model calls and always includes six comparison rows, controls, output
+lengths, per-metric denominators, unavailable fields, failures, and two diagnostics.
+The report separates the six initial comparison rows from any explicitly requested
+follow-up. A failed generation's zero answerability is marked as a failure-policy
+score, while its content-quality scores remain unavailable. Follow-ups preserve
+the original attempt and never silently replace the primary comparison.
+Any explicit prompt clarification is disclosed with its follow-up. Scoring
+consistency reviews retain original grades and record the reviewed answer points
+and rationale; the report uses the corrected derived score.
+With n=1, case scores and dataset means are identical. Inspect saved decks and
+rubric reasons when discussing successes, ties, and regressions; no individual
+agent's contribution is isolated by this comparison.
+
+One case per dataset, one run per condition, public-source familiarity,
+model-generated assessments, and correlated model judgments limit interpretation.
+These are automated quality and answerability estimates, not observed student
+learning, Hake normalized gain, confidence, or instructor workload savings. They
+address Milestone 1 concerns without establishing its human-study success criterion.
+Human studies, Q&A, flashcards, quizzes, version restoration, critic interventions,
+ablations, cost instrumentation, and stress tests are deferred. Instructional
+Agents remains related work and a deferred empirical comparison.

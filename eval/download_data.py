@@ -7,9 +7,15 @@
 # Sources and licenses are listed in eval/README.md.
 
 import json
+import hashlib
 import os
 import urllib.parse
 import urllib.request
+import ssl
+from datetime import datetime, timezone
+from pathlib import Path
+
+import certifi
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PUBLIC = os.path.join(HERE, "data", "public")
@@ -21,7 +27,7 @@ COLLEGE = os.path.join(HERE, "data", "college")
 
 def _get(url: str) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": "tutor-eval/1.0"})
-    with urllib.request.urlopen(req, timeout=60) as r:
+    with urllib.request.urlopen(req, timeout=120, context=ssl.create_default_context(cafile=certifi.where())) as r:
         return r.read()
 
 
@@ -85,11 +91,15 @@ def d2l_optimization(out_path: str):
     base = "https://raw.githubusercontent.com/d2l-ai/d2l-en/master/chapter_optimization/"
     sections = ["adam.md", "momentum.md", "rmsprop.md"]
     parts = []
+    originals = []
     for s in sections:
-        parts.append(f"\n\n===== {s} =====\n\n" + _clean_d2l(_get(base + s).decode("utf-8", "ignore")))
+        raw = _get(base + s).decode("utf-8", "ignore")
+        originals.append({"url": base + s, "characters": len(raw), "sha256": hashlib.sha256(raw.encode()).hexdigest()})
+        parts.append(f"\n\n===== {s} =====\n\n" + _clean_d2l(raw))
     text = "".join(parts)
     open(out_path, "w").write(text)
     print(f"  {len(text):>7} chars  {os.path.basename(out_path)}")
+    return originals
 
 
 def _clean_d2l(text: str) -> str:
@@ -174,5 +184,46 @@ def write_large():
     print(f"wrote {out} ({len(text)} chars)")
 
 
+def selected_sources():
+    """Prepare only the two course sources, preserving provenance beside the text."""
+    from pypdf import PdfReader
+    import logging
+    logging.getLogger("pypdf").setLevel(logging.ERROR)
+    school = Path(SCHOOL) / "siyavula_maths_gr9.txt"
+    college = Path(COLLEGE) / "d2l_optimization.txt"
+    for path in (school, college):
+        path.parent.mkdir(parents=True, exist_ok=True)
+    if not school.exists() or not school.with_suffix(".meta.json").exists():
+        url = "https://www.siyavula.com/downloads/books/maths/Gr9A_Mathematics_Learner_Eng.pdf"
+        pdf = Path(SCHOOL) / "Gr9A_Mathematics_Learner_Eng.pdf"
+        if not pdf.exists():
+            pdf.write_bytes(_get(url))
+        reader = PdfReader(pdf)
+        pages = [(p.extract_text() or "") for p in reader.pages[:110]]
+        if not pages[32].startswith("Chapter 2\nIntegers") or not pages[44].startswith("Chapter 3"):
+            raise ValueError("Textbook edition changed: verify the Integers chapter boundaries")
+        text = "\n\n".join(pages[32:44]).strip()
+        school.write_text(text, encoding="utf-8")
+        school.with_suffix(".meta.json").write_text(json.dumps({
+            "urls": [url], "retrieved_at": datetime.fromtimestamp(pdf.stat().st_mtime, timezone.utc).isoformat(),
+            "attribution": "Siyavula Mathematics Grade 9, CC BY 3.0",
+            "original_bytes": pdf.stat().st_size, "original_pages": len(reader.pages),
+            "original_chars": len("\n\n".join(pages)), "pdf_pages": [33, 44],
+            "extraction": "Integers chapter, printed pages 27–38; other chapters excluded; pypdf text extraction"
+        }, indent=2), encoding="utf-8")
+    if not college.exists() or not college.with_suffix(".meta.json").exists() or "original_sections" not in json.loads(college.with_suffix(".meta.json").read_text()):
+        originals = d2l_optimization(str(college))
+        base = "https://raw.githubusercontent.com/d2l-ai/d2l-en/master/chapter_optimization/"
+        college.with_suffix(".meta.json").write_text(json.dumps({
+            "urls": [base + n for n in ("adam.md", "momentum.md", "rmsprop.md")],
+            "retrieved_at": datetime.now(timezone.utc).isoformat(),
+            "attribution": "Zhang, Lipton, Li and Smola, Dive into Deep Learning, CC BY-SA 4.0",
+            "original_chars": sum(section["characters"] for section in originals), "original_sections": originals,
+            "extraction": "Existing Adam, momentum, RMSProp extraction; code blocks and book markup removed, prose and formulas retained"
+        }, indent=2), encoding="utf-8")
+    return school, college
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+    selected_sources() if "--selected" in sys.argv else main()
