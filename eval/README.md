@@ -44,6 +44,18 @@ Raw files are not committed. Regenerate with
   the ML docs, with the needle topic (Nadam) in the tail, past B1's 150k
   cutoff. B1 truncates and cannot reach it; our system and B2 retrieve it.
   This is the condition where retrieval is supposed to matter.
+- **D5 school** (`data/school/`): Grade 9 Mathematics from Siyavula (CC BY 3.0),
+  a real national-curriculum textbook (first ~110 pages). Dense with worked
+  examples and specific numbers, so comprehension questions must come from the
+  text rather than general knowledge. This is the school-level dataset.
+- **D6 college** (`data/college/`): the optimization chapter of Dive into Deep
+  Learning (CC BY-SA 4.0), pulled from the book's GitHub source. Real college
+  course material with specific update rules, learning rates, and worked
+  examples. This is the college-level dataset.
+
+D5 and D6 are the two real course-material datasets the stakeholder asked for
+(one school, one college). They are deliberately rich in numbers and examples so
+the learning metric has signal instead of ceiling-ing out on a famous topic.
 
 ## Headline metrics (does the student learn?)
 

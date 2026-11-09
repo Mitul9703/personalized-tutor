@@ -50,6 +50,16 @@ TASKS = [
     # the only way to reach it.
     {"dataset": "large", "doc": _p("large", "big_ml_reader.txt"),
      "topic": "the Nadam optimizer and how it combines Nesterov momentum with Adam"},
+
+    # D5 school -- real Grade 9 school material (Siyavula Mathematics, CC BY 3.0),
+    # dense with worked examples and specific numbers, so questions need the text.
+    {"dataset": "school", "doc": _p("school", "siyavula_maths_gr9.txt"),
+     "topic": "adding, subtracting and multiplying integers, including the rules for negative numbers"},
+
+    # D6 college -- real college course material (Dive into Deep Learning
+    # optimization chapter, CC BY-SA 4.0), with specific update rules and numbers.
+    {"dataset": "college", "doc": _p("college", "d2l_optimization.txt"),
+     "topic": "the Adam optimizer and how it combines momentum and RMSProp"},
 ]
 
 

@@ -15,6 +15,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PUBLIC = os.path.join(HERE, "data", "public")
 ML = os.path.join(HERE, "data", "ml")
 LARGE = os.path.join(HERE, "data", "large")
+SCHOOL = os.path.join(HERE, "data", "school")
+COLLEGE = os.path.join(HERE, "data", "college")
 
 
 def _get(url: str) -> bytes:
@@ -72,9 +74,27 @@ def openstax(url: str, out_path: str):
     print(f"  {len(text):>7} chars  {os.path.basename(out_path)}")
 
 
+def d2l_optimization(out_path: str):
+    # Concatenate the optimization chapter of Dive into Deep Learning (CC BY-SA
+    # 4.0) from the book's GitHub source. These sections are dense with specific
+    # learning rates, update rules, and worked examples, so questions must come
+    # from the text rather than general knowledge.
+    base = "https://raw.githubusercontent.com/d2l-ai/d2l-en/master/chapter_optimization/"
+    sections = ["gd.md", "sgd.md", "minibatch-sgd.md", "momentum.md", "adagrad.md",
+                "rmsprop.md", "adam.md", "lr-scheduler.md"]
+    parts = []
+    for s in sections:
+        parts.append(f"\n\n===== {s} =====\n\n" + _get(base + s).decode("utf-8", "ignore"))
+    text = "".join(parts)
+    open(out_path, "w").write(text)
+    print(f"  {len(text):>7} chars  {os.path.basename(out_path)}")
+
+
 def main():
     os.makedirs(PUBLIC, exist_ok=True)
     os.makedirs(ML, exist_ok=True)
+    os.makedirs(SCHOOL, exist_ok=True)
+    os.makedirs(COLLEGE, exist_ok=True)
 
     print("D1 public (general knowledge):")
     wikipedia("Photosynthesis", os.path.join(PUBLIC, "photosynthesis.txt"))
@@ -100,6 +120,15 @@ def main():
 
     print("D4 large (concatenated reader for the big-document task):")
     write_large()
+
+    print("D5 school (Grade 9 Mathematics, Siyavula, CC BY 3.0):")
+    pdf_pages(
+        "https://www.siyavula.com/downloads/books/maths/Gr9A_Mathematics_Learner_Eng.pdf",
+        os.path.join(SCHOOL, "siyavula_maths_gr9.txt"), first_pages=110,
+    )
+
+    print("D6 college (Dive into Deep Learning optimization chapter, CC BY-SA 4.0):")
+    d2l_optimization(os.path.join(COLLEGE, "d2l_optimization.txt"))
 
 
 def write_large():
