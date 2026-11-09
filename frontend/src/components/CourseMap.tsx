@@ -6,7 +6,7 @@ import { cn } from "../lib/cn";
 export function CourseMap() {
   const outline = useStore((s) => s.outline);
   const send = useStore((s) => s.send);
-  const busy = useStore((s) => s.busy);
+  const busy = useStore((s) => s.busy || s.profileSaving);
   const [open, setOpen] = useState(true);
 
   const topics = outline?.topics ?? [];

@@ -82,13 +82,14 @@ def qa(state: dict, session) -> dict:
     if req.get("target_slide_ids"):
         question += f"\n(The student is looking at slides: {req['target_slide_ids']})"
 
+    _, notes = _learner_context(session, course_id)
     reply = answer_question(
         session,
         course_id,
         question,
         intent=state.get("intent", "answer"),
         router_note=state.get("response", ""),
-        learner_notes=_learner_notes(session, course_id),
+        learner_notes=notes,
     )
     session.add(Message(
         course_id=course_id,
@@ -113,15 +114,15 @@ def planner(state: dict, session) -> dict:
     req = state["request"]
     target = state.get("target", {})
     course_id = state["course_id"]
-    notes = _learner_notes(session, course_id)
+    profile, notes = _learner_context(session, course_id)
 
     if state["intent"] == "evolve":
         artifact = session.get(Artifact, _artifact_id(state))
         unit = session.get(StudyUnit, artifact.study_unit_id)
-        plan = plan_topic(session, course_id, unit.topic, notes, instruction=req["text"])
+        plan = plan_topic(session, course_id, unit.topic, notes, instruction=req["text"], learner_profile=profile)
     else:
         topic = target.get("topic") or req["text"]
-        plan = plan_topic(session, course_id, topic, notes)
+        plan = plan_topic(session, course_id, topic, notes, instruction=req["text"], learner_profile=profile)
 
     chunk_ids = []
     for point in plan.get("points", []):
@@ -245,6 +246,6 @@ def _load_chunks(session, chunk_ids):
     return [{"id": c.id, "text": c.text, "location": c.location} for c in rows]
 
 
-def _learner_notes(session, course_id: str) -> str:
+def _learner_context(session, course_id: str) -> tuple[dict, str]:
     row = session.query(LearnerModel).filter(LearnerModel.course_id == course_id).first()
-    return row.notes if row and row.notes else ""
+    return (row.profile or {}, row.notes or "") if row else ({}, "")

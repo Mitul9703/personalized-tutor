@@ -5,6 +5,8 @@ import type {
   Deck,
   DeckRef,
   Outline,
+  LearnerProfile,
+  OnboardingResponse,
   QuizResult,
   TurnResponse,
 } from "./types";
@@ -21,6 +23,19 @@ async function unwrap<T>(res: Response): Promise<T> {
 }
 
 export const api = {
+  getCourse: (courseId: string) =>
+    fetch(`${BASE}/courses/${courseId}`).then(unwrap<{ course_id: string; title: string }>),
+
+  getOnboarding: (courseId: string) =>
+    fetch(`${BASE}/courses/${courseId}/onboarding`).then(unwrap<OnboardingResponse>),
+
+  saveOnboarding: (courseId: string, profile: LearnerProfile) =>
+    fetch(`${BASE}/courses/${courseId}/onboarding`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify(profile),
+    }).then(unwrap<OnboardingResponse>),
+
   createCourse: (title: string) =>
     fetch(`${BASE}/courses`, {
       method: "POST",

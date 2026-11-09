@@ -11,7 +11,7 @@ const SUGGESTIONS = [
 
 export function ChatInput() {
   const send = useStore((s) => s.send);
-  const busy = useStore((s) => s.busy);
+  const busy = useStore((s) => s.busy || s.profileSaving);
   const deck = useStore((s) => s.deck);
   const focusedSlideId = useStore((s) => s.focusedSlideId);
   const focusSlide = useStore((s) => s.focusSlide);
