@@ -79,15 +79,33 @@ def d2l_optimization(out_path: str):
     # 4.0) from the book's GitHub source. These sections are dense with specific
     # learning rates, update rules, and worked examples, so questions must come
     # from the text rather than general knowledge.
+    # Scope to the taught topic (Adam and the two methods it combines) so the
+    # whole relevant source fits the eval's question/grounding window. The topic
+    # section leads, then its components, so a prefix read still covers the topic.
     base = "https://raw.githubusercontent.com/d2l-ai/d2l-en/master/chapter_optimization/"
-    sections = ["gd.md", "sgd.md", "minibatch-sgd.md", "momentum.md", "adagrad.md",
-                "rmsprop.md", "adam.md", "lr-scheduler.md"]
+    sections = ["adam.md", "momentum.md", "rmsprop.md"]
     parts = []
     for s in sections:
-        parts.append(f"\n\n===== {s} =====\n\n" + _get(base + s).decode("utf-8", "ignore"))
+        parts.append(f"\n\n===== {s} =====\n\n" + _clean_d2l(_get(base + s).decode("utf-8", "ignore")))
     text = "".join(parts)
     open(out_path, "w").write(text)
     print(f"  {len(text):>7} chars  {os.path.basename(out_path)}")
+
+
+def _clean_d2l(text: str) -> str:
+    # The raw markdown repeats the same algorithm as PyTorch, MXNet, and
+    # TensorFlow code, and carries d2lbook directives and math delimiters. That
+    # boilerplate dominates the chunks and drowns out the prose, so we keep the
+    # explanatory text and formulas and drop the noise. Content is unchanged.
+    import re
+    text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)        # drop code blocks
+    text = re.sub(r"`{1,2}[^`]*`{1,2}", "", text)                 # inline code / tab markers
+    text = re.sub(r":[a-z_]+:`[^`]*`", "", text)                  # :numref:`...` cross-refs
+    text = re.sub(r"^\s*:[a-z_]+:.*$", "", text, flags=re.MULTILINE)  # :label: lines
+    text = re.sub(r":[a-z_]+:", " ", text)                       # bare inline markers like :cite:
+    text = text.replace("$$", " ").replace("$", " ")             # unwrap math, keep formula text
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
 
 def main():

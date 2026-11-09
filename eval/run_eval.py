@@ -110,10 +110,14 @@ def _rate(flags):
 
 def _deck_metrics(deck, doc, questions):
     teach = _safe(lambda: score_answers(questions, answer_from_tutorial(deck, questions))) if questions else None
+    # one judge pass gives grounding plus content accuracy and quality
+    judgement = _safe(lambda: judge_deck(deck, doc), {}) or {}
     return {
         "teach": teach["score"] if teach else None,
         "pedagogy": _safe(lambda: pedagogy_score(deck, ""), {}).get("mean"),
-        "grounded": _safe(lambda: groundedness(judge_deck(deck, doc))),
+        "grounded": _safe(lambda: groundedness(judgement)),
+        "accuracy": judgement.get("correctness"),   # content accuracy, 1-5
+        "quality": judgement.get("overall"),         # content quality, 1-5
         "cite_valid": _safe(lambda: citation_validity(deck, resolve_chunk)),
         "slides": len(deck.get("slides", [])),
     }
@@ -175,8 +179,13 @@ def run_interaction_task(task):
 def run(limit=None, qn=5, pers_limit=1, itx_limit=1):
     core, pers, inter = [], [], []
     c, pc, ic = {}, {}, {}
+    # optional filter: EVAL_DATASETS="school,college" runs only those datasets.
+    only = os.environ.get("EVAL_DATASETS")
+    allowed = {d.strip() for d in only.split(",")} if only else None
     for task in TASKS:
         ds = task["dataset"]
+        if allowed and ds not in allowed:
+            continue
         c[ds] = c.get(ds, 0) + 1
         if not (limit and c[ds] > limit):
             core.append(_safe(lambda t=task: run_core(t, qn)))
@@ -195,7 +204,12 @@ def run(limit=None, qn=5, pers_limit=1, itx_limit=1):
 
 def _report(core, pers, inter):
     print("\n================ RESULTS ================")
-    for ds in ("novel", "public", "ml", "large"):
+    # school and college are the stakeholder's two datasets, so show them first;
+    # the rest are development/scaffolding datasets.
+    order = ["school", "college", "public", "ml", "novel", "large"]
+    present = [d for d in order if any(r["dataset"] == d for r in core)]
+    present += [d for d in sorted({r["dataset"] for r in core}) if d not in present]
+    for ds in present:
         rows = [r for r in core if r["dataset"] == ds]
         if not rows:
             continue
@@ -208,6 +222,9 @@ def _report(core, pers, inter):
         print(f"{'teaching effectiveness':<24}{str(col('teach','system')):>9}{str(col('teach','b1')):>11}{str(col('teach','b2')):>9}")
         print(f"{'  (no-tutorial control)':<24}{str(_mean([r['control'] for r in rows])):>9}")
         print(f"{'pedagogy (1-5)':<24}{str(col('pedagogy','system')):>9}{str(col('pedagogy','b1')):>11}{str(col('pedagogy','b2')):>9}")
+        print("-- content (judge, 1-5) --")
+        print(f"{'content accuracy':<24}{str(col('accuracy','system')):>9}{str(col('accuracy','b1')):>11}{str(col('accuracy','b2')):>9}")
+        print(f"{'content quality':<24}{str(col('quality','system')):>9}{str(col('quality','b1')):>11}{str(col('quality','b2')):>9}")
         print("-- guardrails --")
         print(f"{'groundedness':<24}{str(col('grounded','system')):>9}{str(col('grounded','b1')):>11}{str(col('grounded','b2')):>9}")
         print(f"{'citation validity':<24}{str(col('cite_valid','system')):>9}{str(col('cite_valid','b1')):>11}{str(col('cite_valid','b2')):>9}")
