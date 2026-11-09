@@ -1,9 +1,10 @@
-import { Layers, ListChecks, Maximize2, Minimize2, RotateCcw, X } from "lucide-react";
+import { Layers, Layers3, ListChecks, Maximize2, Minimize2, RotateCcw, X } from "lucide-react";
 import { useStore } from "../store/useStore";
-import type { Quiz } from "../api/types";
+import type { Quiz, FlashcardSet } from "../api/types";
 import { VersionBar } from "./VersionBar";
 import { SlideDeck } from "./SlideDeck";
 import { QuizView } from "./QuizView";
+import { FlashcardDeck } from "./FlashcardDeck";
 
 export function ArtifactPanel() {
   const deck = useStore((s) => s.deck);
@@ -17,10 +18,12 @@ export function ArtifactPanel() {
   const selectDeck = useStore((s) => s.selectDeck);
   const activeArtifactId = useStore((s) => s.activeArtifactId);
   const createQuiz = useStore((s) => s.createQuiz);
+  const createFlashcards = useStore((s) => s.createFlashcards);
   const busy = useStore((s) => s.busy);
 
   if (!deck) return null;
   const isQuiz = detail?.type === "quiz";
+  const isFlashcards = detail?.type === "flashcards";
   const viewingNumber =
     viewing && detail ? detail.versions.find((v) => v.version_id === viewing)?.version_number : null;
 
@@ -53,6 +56,18 @@ export function ArtifactPanel() {
           >
             <ListChecks className="h-3.5 w-3.5" />
             Quiz me
+          </button>
+        )}
+
+        {!isFlashcards && (
+          <button
+            onClick={() => createFlashcards(deck.title)}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-brand hover:bg-brandsoft disabled:opacity-40"
+            title="Make flashcards on this topic"
+          >
+            <Layers3 className="h-3.5 w-3.5" />
+            Flashcards
           </button>
         )}
 
@@ -94,7 +109,9 @@ export function ArtifactPanel() {
       )}
 
       <div className="min-h-0 flex-1">
-        {isQuiz && activeArtifactId ? (
+        {isFlashcards ? (
+          <FlashcardDeck set={deck as unknown as FlashcardSet} readOnly={!!viewing} />
+        ) : isQuiz && activeArtifactId ? (
           <QuizView
             quiz={deck as unknown as Quiz}
             artifactId={activeArtifactId}

@@ -30,6 +30,28 @@ export interface Deck {
   slides: Slide[];
 }
 
+export interface Flashcard {
+  id: string;
+  front: string;
+  back: string;
+  provenance: "source" | "supplementary";
+  citations: Citation[];
+}
+
+export interface FlashcardSet {
+  title: string;
+  cards: Flashcard[];
+}
+
+export interface FlashcardResponse {
+  intent: string;
+  type: "flashcards";
+  artifact_id: string;
+  version_id: string;
+  version_number: number;
+  content: FlashcardSet;
+}
+
 export interface VersionMeta {
   version_id: string;
   version_number: number;

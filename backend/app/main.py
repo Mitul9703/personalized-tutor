@@ -4,7 +4,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import courses, documents, messages, artifacts, quizzes
+from app.api import courses, documents, messages, artifacts, quizzes, flashcards
 
 app = FastAPI(title="Personalized Tutor API")
 
@@ -22,6 +22,7 @@ app.include_router(documents.router)
 app.include_router(messages.router)
 app.include_router(artifacts.router)
 app.include_router(quizzes.router)
+app.include_router(flashcards.router)
 
 
 @app.get("/health")
