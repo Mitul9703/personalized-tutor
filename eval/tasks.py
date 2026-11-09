@@ -53,13 +53,23 @@ TASKS = [
 
     # D5 school -- real Grade 9 school material (Siyavula Mathematics, CC BY 3.0),
     # dense with worked examples and specific numbers, so questions need the text.
+    # Topics come from the early chapters (whole numbers, integers) so their
+    # content sits within the eval's question/grounding window.
     {"dataset": "school", "doc": _p("school", "siyavula_maths_gr9.txt"),
      "topic": "adding, subtracting and multiplying integers, including the rules for negative numbers"},
+    {"dataset": "school", "doc": _p("school", "siyavula_maths_gr9.txt"),
+     "topic": "the properties of whole numbers: the identity element and the commutative, associative and distributive laws"},
+    {"dataset": "school", "doc": _p("school", "siyavula_maths_gr9.txt"),
+     "topic": "multiplying and dividing whole numbers, including long division and checking the answer"},
 
     # D6 college -- real college course material (Dive into Deep Learning
     # optimization chapter, CC BY-SA 4.0), with specific update rules and numbers.
     {"dataset": "college", "doc": _p("college", "d2l_optimization.txt"),
      "topic": "the Adam optimizer and how it combines momentum and RMSProp"},
+    {"dataset": "college", "doc": _p("college", "d2l_optimization.txt"),
+     "topic": "momentum and how a leaky average of past gradients smooths and speeds up updates"},
+    {"dataset": "college", "doc": _p("college", "d2l_optimization.txt"),
+     "topic": "RMSProp and how it adapts the step size per coordinate using a moving average of squared gradients"},
 ]
 
 
