@@ -111,6 +111,8 @@ export const useStore = create<State>((set, get) => ({
         role: m.role,
         text: m.text,
         artifactId: m.artifact_id,
+        citations: m.citations,
+        usesGeneralKnowledge: m.uses_general_knowledge,
       }));
       set({ outline, decks, messages, phase: "ready" });
       if (decks.length > 0) {
@@ -145,7 +147,16 @@ export const useStore = create<State>((set, get) => ({
         await get().refreshDecks();
       } else {
         set((s) => ({
-          messages: [...s.messages, { id: rid(), role: "system", text: res.reply ?? "…" }],
+          messages: [
+            ...s.messages,
+            {
+              id: rid(),
+              role: "system",
+              text: res.reply ?? "…",
+              citations: res.citations,
+              usesGeneralKnowledge: res.uses_general_knowledge,
+            },
+          ],
         }));
       }
     } catch (e) {

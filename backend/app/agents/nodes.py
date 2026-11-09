@@ -8,6 +8,7 @@ from app.agents.planner import plan_topic
 from app.agents.builder import run_builder
 from app.agents.critic import review
 from app.agents.memory import update_notes
+from app.agents.qa import answer as answer_question
 from app.store.versioning import revert_to
 from app.store.models import StudyUnit, Artifact, ArtifactVersion, Message, LearnerModel, Chunk
 
@@ -26,11 +27,11 @@ def router(state: dict, session) -> dict:
 
 
 def route_after_router(state: dict) -> str:
-    # answer and clarify turns reply with no deck; revert goes to its own
-    # node; everything else runs the build pipeline.
+    # answer and clarify turns go to the QA agent and reply with no deck;
+    # revert goes to its own node; everything else runs the build pipeline.
     intent = state.get("intent")
     if intent in ("answer", "clarify"):
-        return "respond"
+        return "qa"
     if intent == "revert":
         return "revert"
     return "planner"
@@ -71,12 +72,40 @@ def revert(state: dict, session) -> dict:
     }}
 
 
-def respond(state: dict, session) -> dict:
-    # a plain reply with no deck. save it as a system message.
-    text = state.get("response") or "Could you say a bit more about what you want?"
-    session.add(Message(course_id=state["course_id"], role="system", text=text))
+def qa(state: dict, session) -> dict:
+    # answer and clarify turns. the QA agent searches the material and
+    # replies in chat with citations, or asks one clarifying question. no
+    # deck is built. save the reply with its citations as a system message.
+    course_id = state["course_id"]
+    req = state["request"]
+    question = req["text"]
+    if req.get("target_slide_ids"):
+        question += f"\n(The student is looking at slides: {req['target_slide_ids']})"
+
+    reply = answer_question(
+        session,
+        course_id,
+        question,
+        intent=state.get("intent", "answer"),
+        router_note=state.get("response", ""),
+        learner_notes=_learner_notes(session, course_id),
+    )
+    session.add(Message(
+        course_id=course_id,
+        role="system",
+        text=reply["text"],
+        citations={"items": reply["citations"], "uses_general_knowledge": reply["uses_general_knowledge"]},
+    ))
     session.commit()
-    return {"response": text}
+
+    if reply["kind"] == "answer":
+        update_notes(session, course_id, req["text"], "none, answered in chat")
+
+    return {
+        "response": reply["text"],
+        "answer_citations": reply["citations"],
+        "uses_general_knowledge": reply["uses_general_knowledge"],
+    }
 
 
 def planner(state: dict, session) -> dict:
