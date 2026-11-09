@@ -1,24 +1,29 @@
 # The evaluation harness, built around learning rather than deck mechanics.
 #
+# It compares our system against two baselines on the same inputs and the same
+# model (gpt-6-luna), so a difference is architectural:
+#   B1 single call  - whole document in one prompt, no retrieval.
+#   B2 RAG one-shot - retrieve top chunks, then one generation. No planner,
+#                     critic, learner model, or interaction.
+#
 # Headline (does the student learn?):
 #   - teaching effectiveness: a simulated student reads ONLY the tutorial,
-#     answers source based questions, and is scored. We also answer with no
-#     tutorial at all (prior-knowledge control) so the tutorial's lift is honest.
-#   - personalization: our system under a beginner vs an advanced profile;
-#     do the lessons differ in the right direction? The baseline has no
-#     learner model, so it cannot personalize at all.
-#   - pedagogy: a learning-science rubric (scaffolding, concreteness, checks,
-#     load, clarity), not a flat "quality" number.
+#     answers source-based questions, is scored. A no-tutorial control shows
+#     prior knowledge, so the lift is honest.
+#   - pedagogy: a learning-science rubric.
+#   - personalization: our system under a beginner vs an advanced profile.
+#   - interaction quality: can the student steer the deck after the fact
+#     (explain deeper, simplify, add example) and stay grounded. The baselines
+#     cannot do this at all.
 #
 # Guardrails (is it trustworthy?):
-#   - groundedness: of source slides, the fraction the judge finds supported.
-#   - citation validity: of all citations, the fraction that resolve to a
-#     real, retrievable chunk. Our citations resolve; the baseline invents them.
-#
+#   - groundedness, citation validity.
+# Agent behavior:
+#   - planted-error catch rate (does the Critic catch an injected false claim).
 # Footnote: latency.
 #
 # Run with the backend up:
-#   cd backend && .venv/bin/python ../eval/run_eval.py [limit_per_dataset] [questions] [pers_per_dataset]
+#   cd backend && .venv/bin/python ../eval/run_eval.py [limit_per_dataset] [questions] [pers_per_dataset] [interaction_per_dataset]
 
 import json
 import os
@@ -32,12 +37,14 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 
 from tasks import TASKS, load_doc  # noqa: E402
-from baselines import single_call_baseline  # noqa: E402
+from baselines import single_call_baseline, rag_baseline  # noqa: E402
 from questions import make_questions  # noqa: E402
 from learner import answer_from_tutorial, answer_without_tutorial, score_answers  # noqa: E402
 from pedagogy import pedagogy_score  # noqa: E402
 from judge import judge_deck, groundedness, citation_validity  # noqa: E402
 import personalization as pz  # noqa: E402
+import agent_behavior as ab  # noqa: E402
+import interaction as itx  # noqa: E402
 
 BASE = os.environ.get("TUTOR_API", "http://localhost:8001")
 
@@ -46,7 +53,7 @@ def _post(path, body):
     data = json.dumps(body).encode()
     req = urllib.request.Request(BASE + path, data=data, method="POST",
                                  headers={"content-type": "application/json"})
-    return json.load(urllib.request.urlopen(req, timeout=600))
+    return json.load(urllib.request.urlopen(req, timeout=900))
 
 
 def _upload(course_id, path):
@@ -58,7 +65,7 @@ def _upload(course_id, path):
     ).encode() + body + f"\r\n--{b}--\r\n".encode()
     req = urllib.request.Request(BASE + f"/courses/{course_id}/documents", data=payload,
                                  method="POST", headers={"content-type": f"multipart/form-data; boundary={b}"})
-    urllib.request.urlopen(req, timeout=600)
+    urllib.request.urlopen(req, timeout=900)
 
 
 def _new_course_with_doc(doc_path):
@@ -77,8 +84,6 @@ def resolve_chunk(chunk_id):
     try:
         with urllib.request.urlopen(BASE + f"/chunks/{chunk_id}", timeout=60) as r:
             return r.status == 200
-    except urllib.error.HTTPError:
-        return False
     except Exception:
         return False
 
@@ -96,7 +101,23 @@ def _mean(values):
     return round(sum(vals) / len(vals), 3) if vals else None
 
 
-# ---------------- core run (teaching, pedagogy, guardrails) ----------------
+def _rate(flags):
+    vals = [bool(f) for f in flags if f is not None]
+    return round(sum(vals) / len(vals), 3) if vals else None
+
+
+# ---- per-deck metrics shared by our system and both baselines ----
+
+def _deck_metrics(deck, doc, questions):
+    teach = _safe(lambda: score_answers(questions, answer_from_tutorial(deck, questions))) if questions else None
+    return {
+        "teach": teach["score"] if teach else None,
+        "pedagogy": _safe(lambda: pedagogy_score(deck, ""), {}).get("mean"),
+        "grounded": _safe(lambda: groundedness(judge_deck(deck, doc))),
+        "cite_valid": _safe(lambda: citation_validity(deck, resolve_chunk)),
+        "slides": len(deck.get("slides", [])),
+    }
+
 
 def run_core(task, qn):
     ds, topic = task["dataset"], task["topic"]
@@ -104,114 +125,111 @@ def run_core(task, qn):
     print(f"[{ds}] {os.path.basename(task['doc'])} :: {topic}")
 
     questions = _safe(lambda: make_questions(doc, topic, n=qn), []) or []
-    print(f"   {len(questions)} questions")
+    control = _safe(lambda: score_answers(questions, answer_without_tutorial(questions))) if questions else None
 
+    # our system
     course_id = _new_course_with_doc(task["doc"])
     sys_deck, sys_lat = system_generate(course_id, topic)
+    sysm = _deck_metrics(sys_deck, doc, questions); sysm["latency"] = round(sys_lat, 1)
 
-    t0 = time.time()
-    base_deck = single_call_baseline(doc, topic)
-    base_lat = time.time() - t0
+    # B1 single call
+    t0 = time.time(); b1_deck = single_call_baseline(doc, topic); b1_lat = time.time() - t0
+    b1m = _deck_metrics(b1_deck, doc, questions); b1m["latency"] = round(b1_lat, 1)
 
-    # teaching effectiveness
-    control = _safe(lambda: score_answers(questions, answer_without_tutorial(questions))) if questions else None
-    teach_sys = _safe(lambda: score_answers(questions, answer_from_tutorial(sys_deck, questions))) if questions else None
-    teach_base = _safe(lambda: score_answers(questions, answer_from_tutorial(base_deck, questions))) if questions else None
+    # B2 RAG one-shot
+    t0 = time.time(); b2_deck = rag_baseline(doc, topic); b2_lat = time.time() - t0
+    b2m = _deck_metrics(b2_deck, doc, questions); b2m["latency"] = round(b2_lat, 1)
 
-    rec = {
-        "dataset": ds, "doc": os.path.basename(task["doc"]), "topic": topic,
-        "n_questions": len(questions),
-        "teach_control": control["score"] if control else None,
-        "teach_system": teach_sys["score"] if teach_sys else None,
-        "teach_baseline": teach_base["score"] if teach_base else None,
-        "pedagogy_system": _safe(lambda: pedagogy_score(sys_deck, topic), {}).get("mean"),
-        "pedagogy_baseline": _safe(lambda: pedagogy_score(base_deck, topic), {}).get("mean"),
-        "grounded_system": _safe(lambda: groundedness(judge_deck(sys_deck, doc))),
-        "grounded_baseline": _safe(lambda: groundedness(judge_deck(base_deck, doc))),
-        "cite_valid_system": _safe(lambda: citation_validity(sys_deck, resolve_chunk)),
-        "cite_valid_baseline": _safe(lambda: citation_validity(base_deck, resolve_chunk)),
-        "latency_system": round(sys_lat, 1), "latency_baseline": round(base_lat, 1),
-        "slides_system": len(sys_deck.get("slides", [])), "slides_baseline": len(base_deck.get("slides", [])),
-    }
-    print(f"   teaching : control={rec['teach_control']} system={rec['teach_system']} baseline={rec['teach_baseline']}")
-    print(f"   pedagogy : system={rec['pedagogy_system']} baseline={rec['pedagogy_baseline']}")
-    print(f"   grounded : system={rec['grounded_system']} baseline={rec['grounded_baseline']}  "
-          f"cite_valid: system={rec['cite_valid_system']} baseline={rec['cite_valid_baseline']}")
+    catch = _safe(lambda: ab.catch_check(course_id, sys_deck, topic), {}) or {}
+
+    rec = {"dataset": ds, "doc": os.path.basename(task["doc"]), "topic": topic,
+           "n_questions": len(questions), "control": control["score"] if control else None,
+           "system": sysm, "b1": b1m, "b2": b2m, "catch": catch}
+    print(f"   teach   : ctrl={rec['control']} ours={sysm['teach']} b1={b1m['teach']} b2={b2m['teach']}")
+    print(f"   grounded: ours={sysm['grounded']} b1={b1m['grounded']} b2={b2m['grounded']}  "
+          f"catch={catch.get('caught')} clean_ok={catch.get('clean_passed')}")
     return rec
 
-
-# ---------------- personalization run (our system only) ----------------
 
 def run_personalization(task):
     ds, topic = task["dataset"], task["topic"]
     print(f"[pers/{ds}] {topic}")
-
-    nov_course = _new_course_with_doc(task["doc"])
-    pz.set_learner_notes(nov_course, pz.NOVICE)
-    nov_deck, _ = system_generate(nov_course, topic)
-
-    adv_course = _new_course_with_doc(task["doc"])
-    pz.set_learner_notes(adv_course, pz.ADVANCED)
-    adv_deck, _ = system_generate(adv_course, topic)
-
+    nov = _new_course_with_doc(task["doc"]); pz.set_learner_notes(nov, pz.NOVICE)
+    nov_deck, _ = system_generate(nov, topic)
+    adv = _new_course_with_doc(task["doc"]); pz.set_learner_notes(adv, pz.ADVANCED)
+    adv_deck, _ = system_generate(adv, topic)
     d = _safe(lambda: pz.differentiation(nov_deck, adv_deck), {}) or {}
     rec = {"dataset": ds, "topic": topic, "differ": d.get("differ"),
            "direction_correct": d.get("direction_correct"), "note": d.get("note")}
-    print(f"   differ={rec['differ']}/5  direction_correct={rec['direction_correct']}  {rec['note']}")
+    print(f"   differ={rec['differ']}/5 direction_correct={rec['direction_correct']} {rec['note']}")
     return rec
 
 
-def run(limit=None, qn=5, pers_limit=1):
-    core, pers = [], []
-    counts, pcounts = {}, {}
+def run_interaction_task(task):
+    print(f"[interaction] {task['topic']}")
+    rec = _safe(lambda: itx.run_interaction(task["doc"], task["topic"]), {}) or {}
+    print(f"   fulfillment={rec.get('fulfillment')} grounded_after={rec.get('grounded_after')}")
+    return rec
+
+
+def run(limit=None, qn=5, pers_limit=1, itx_limit=1):
+    core, pers, inter = [], [], []
+    c, pc, ic = {}, {}, {}
     for task in TASKS:
         ds = task["dataset"]
-        counts[ds] = counts.get(ds, 0) + 1
-        if not (limit and counts[ds] > limit):
+        c[ds] = c.get(ds, 0) + 1
+        if not (limit and c[ds] > limit):
             core.append(_safe(lambda t=task: run_core(t, qn)))
-        if pcounts.get(ds, 0) < pers_limit:
-            pcounts[ds] = pcounts.get(ds, 0) + 1
+        if pc.get(ds, 0) < pers_limit:
+            pc[ds] = pc.get(ds, 0) + 1
             pers.append(_safe(lambda t=task: run_personalization(t)))
-    core = [r for r in core if r]
-    pers = [r for r in pers if r]
-    _report(core, pers)
+        if ic.get(ds, 0) < itx_limit:
+            ic[ds] = ic.get(ds, 0) + 1
+            inter.append(_safe(lambda t=task: run_interaction_task(t)))
+    core = [r for r in core if r]; pers = [r for r in pers if r]; inter = [r for r in inter if r]
+    _report(core, pers, inter)
     out = os.path.join(HERE, "results.json")
-    json.dump({"core": core, "personalization": pers}, open(out, "w"), indent=2)
+    json.dump({"core": core, "personalization": pers, "interaction": inter}, open(out, "w"), indent=2)
     print(f"\nsaved {out}")
 
 
-def _report(core, pers):
+def _report(core, pers, inter):
     print("\n================ RESULTS ================")
-    for ds in ("novel", "public", "ml"):
+    for ds in ("novel", "public", "ml", "large"):
         rows = [r for r in core if r["dataset"] == ds]
         if not rows:
             continue
         print(f"\nDataset: {ds}  (n={len(rows)})")
-        print(f"{'metric':<26}{'OUR SYSTEM':>12}{'BASELINE':>12}")
+        print(f"{'metric':<24}{'OURS':>9}{'B1 single':>11}{'B2 rag':>9}")
+
+        def col(key, which):
+            return _mean([r[which][key] for r in rows])
         print("-- headline: learning --")
-        print(f"{'teaching effectiveness':<26}{str(_mean([r['teach_system'] for r in rows])):>12}"
-              f"{str(_mean([r['teach_baseline'] for r in rows])):>12}")
-        print(f"{'  (no-tutorial control)':<26}{str(_mean([r['teach_control'] for r in rows])):>12}{'':>12}")
-        print(f"{'pedagogy (1-5)':<26}{str(_mean([r['pedagogy_system'] for r in rows])):>12}"
-              f"{str(_mean([r['pedagogy_baseline'] for r in rows])):>12}")
-        print("-- guardrails: trust --")
-        print(f"{'groundedness':<26}{str(_mean([r['grounded_system'] for r in rows])):>12}"
-              f"{str(_mean([r['grounded_baseline'] for r in rows])):>12}")
-        print(f"{'citation validity':<26}{str(_mean([r['cite_valid_system'] for r in rows])):>12}"
-              f"{str(_mean([r['cite_valid_baseline'] for r in rows])):>12}")
+        print(f"{'teaching effectiveness':<24}{str(col('teach','system')):>9}{str(col('teach','b1')):>11}{str(col('teach','b2')):>9}")
+        print(f"{'  (no-tutorial control)':<24}{str(_mean([r['control'] for r in rows])):>9}")
+        print(f"{'pedagogy (1-5)':<24}{str(col('pedagogy','system')):>9}{str(col('pedagogy','b1')):>11}{str(col('pedagogy','b2')):>9}")
+        print("-- guardrails --")
+        print(f"{'groundedness':<24}{str(col('grounded','system')):>9}{str(col('grounded','b1')):>11}{str(col('grounded','b2')):>9}")
+        print(f"{'citation validity':<24}{str(col('cite_valid','system')):>9}{str(col('cite_valid','b1')):>11}{str(col('cite_valid','b2')):>9}")
+        print("-- agent behavior (our system) --")
+        print(f"{'critic catch rate':<24}{str(_rate([r['catch'].get('caught') for r in rows])):>9}")
+        print(f"{'clean-pass rate':<24}{str(_rate([r['catch'].get('clean_passed') for r in rows])):>9}")
         print("-- footnote --")
-        print(f"{'latency (s)':<26}{str(_mean([r['latency_system'] for r in rows])):>12}"
-              f"{str(_mean([r['latency_baseline'] for r in rows])):>12}")
+        print(f"{'latency (s)':<24}{str(col('latency','system')):>9}{str(col('latency','b1')):>11}{str(col('latency','b2')):>9}")
 
     if pers:
-        print(f"\nPersonalization (our system; baseline has no learner model, cannot personalize)")
+        print("\nPersonalization (our system; baselines have no learner model):")
         for r in pers:
-            print(f"  [{r['dataset']}] {r['topic']}: differ={r['differ']}/5 "
-                  f"direction_correct={r['direction_correct']}")
+            print(f"  [{r['dataset']}] differ={r['differ']}/5 direction_correct={r['direction_correct']}")
+    if inter:
+        print("\nInteraction quality (our system; baselines cannot interact at all):")
+        for r in inter:
+            print(f"  {r.get('topic','')}: fulfillment={r.get('fulfillment')} grounded_after={r.get('grounded_after')}")
 
 
 if __name__ == "__main__":
     lim = int(sys.argv[1]) if len(sys.argv) > 1 else None
     qn = int(sys.argv[2]) if len(sys.argv) > 2 else 5
     pl = int(sys.argv[3]) if len(sys.argv) > 3 else 1
-    run(lim, qn, pl)
+    il = int(sys.argv[4]) if len(sys.argv) > 4 else 1
+    run(lim, qn, pl, il)

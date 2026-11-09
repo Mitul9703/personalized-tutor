@@ -44,6 +44,12 @@ TASKS = [
      "topic": "what causes the Vernalis Tide and why it matters for fishing"},
     {"dataset": "novel", "doc": _p("novel", "kessler_sort.txt"),
      "topic": "how Kessler partitioning sorts a list"},
+
+    # D4 large -- one big reader. The topic (Nadam) lives in the tail of the
+    # document, past the single-call baseline's 150k cutoff, so retrieval is
+    # the only way to reach it.
+    {"dataset": "large", "doc": _p("large", "big_ml_reader.txt"),
+     "topic": "the Nadam optimizer and how it combines Nesterov momentum with Adam"},
 ]
 
 
