@@ -59,6 +59,10 @@ export interface TurnResponse {
   version_id?: string;
   version_number?: number;
   deck?: Deck;
+  // answer and clarify turns: one entry per [n] marker in reply. null means
+  // the cited id did not resolve to a chunk.
+  citations?: (Citation | null)[];
+  uses_general_knowledge?: boolean;
 }
 
 export interface ChatMessage {
@@ -66,6 +70,8 @@ export interface ChatMessage {
   role: "learner" | "system";
   text: string;
   artifactId?: string | null;
+  citations?: (Citation | null)[];
+  usesGeneralKnowledge?: boolean;
 }
 
 export interface OutlineTopic {
@@ -73,6 +79,47 @@ export interface OutlineTopic {
   summary?: string;
   prerequisites?: string[];
   chunk_ids?: string[];
+}
+
+export interface QuizQuestion {
+  id: string;
+  kind: "mcq" | "open";
+  stem: string;
+  options: string[];
+  answer: string;
+  explanation: string;
+  provenance: "source" | "supplementary";
+  citations: Citation[];
+}
+
+export interface Quiz {
+  title: string;
+  questions: QuizQuestion[];
+}
+
+export interface Grade {
+  question_id: string;
+  verdict: "right" | "partial" | "wrong" | "ungraded";
+  feedback: string;
+  provenance: "source" | "supplementary";
+  citations: Citation[];
+  misconception: string;
+}
+
+export interface QuizResult {
+  artifact_id: string;
+  version_id: string;
+  score: number;
+  total: number;
+  grades: Grade[];
+}
+
+export interface CreateQuizResponse {
+  type: "quiz";
+  artifact_id: string;
+  version_id: string;
+  version_number: number;
+  content: Quiz;
 }
 
 export interface Outline {

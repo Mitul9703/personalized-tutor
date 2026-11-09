@@ -13,6 +13,7 @@ import json
 
 from app.agents.agent_loop import run_agent
 from app.ingest.retrieve import retrieve
+from app.store.models import Chunk, Document
 
 MAX_STEPS = 10
 
@@ -132,7 +133,8 @@ def run_builder(session, course_id, *, plan, chunks, base_deck, instruction, int
 
     system = (
         "You build and edit a slide deck for a student using the tools. "
-        "Ground slides in the source chunks and cite their chunk_id. "
+        "Ground slides in the source chunks and cite their chunk_id. The app fills in the "
+        "document name and location from the chunk_id, so you only need to give the id. "
         "Mark anything beyond the sources as provenance 'supplementary' with no citation. "
         "Keep slides short and clear. "
         "When editing an existing deck, make the smallest change that satisfies the request: "
@@ -180,11 +182,11 @@ def _handle(name, args, deck, session, course_id):
 
     if name == "set_deck":
         deck["title"] = args.get("title", deck.get("title", "Untitled"))
-        deck["slides"] = [_norm_slide(s, i) for i, s in enumerate(args.get("slides", []))]
+        deck["slides"] = [_norm_slide(s, i, session, course_id) for i, s in enumerate(args.get("slides", []))]
         return {"ok": True, "slides": len(deck["slides"])}
 
     if name == "add_slide":
-        slide = _norm_slide(args.get("slide", {}), len(slides))
+        slide = _norm_slide(args.get("slide", {}), len(slides), session, course_id)
         after = args.get("after_id")
         if not after:
             slides.append(slide)
@@ -205,7 +207,7 @@ def _handle(name, args, deck, session, course_id):
         if args.get("bullets") is not None:
             slide["bullets"] = args["bullets"]
         if args.get("citations") is not None:
-            slide["citations"] = args["citations"]
+            slide["citations"] = _resolve_citations(session, course_id, args["citations"])
         return {"ok": True}
 
     if name == "delete_slide":
@@ -233,16 +235,51 @@ def _handle(name, args, deck, session, course_id):
     return {"ok": False, "error": f"unknown tool {name}"}
 
 
-def _norm_slide(slide: dict, index: int) -> dict:
+def _norm_slide(slide: dict, index: int, session, course_id) -> dict:
     return {
         "id": slide.get("id") or f"s{index + 1}",
         "heading": slide.get("heading", ""),
         "bullets": slide.get("bullets", []),
         "notes": slide.get("notes", ""),
         "provenance": slide.get("provenance", "source"),
-        "citations": slide.get("citations", []),
+        "citations": _resolve_citations(session, course_id, slide.get("citations", [])),
         "level": slide.get("level", "standard"),
     }
+
+
+def _resolve_citations(session, course_id, citations):
+    # turn whatever the model cited into {chunk_id, doc, loc} using the real
+    # chunk and its document, so a slide citation always names a real source.
+    # the model may pass dicts or bare ids; we only trust the chunk_id and look
+    # up the rest. ids that are not a chunk in this course are dropped, so a
+    # citation never points at nothing.
+    ids = []
+    for c in citations or []:
+        cid = c.get("chunk_id") if isinstance(c, dict) else c
+        if cid and cid not in ids:
+            ids.append(cid)
+    if not ids:
+        return []
+    rows = (
+        session.query(Chunk, Document.filename)
+        .join(Document, Chunk.document_id == Document.id)
+        .filter(Chunk.course_id == course_id, Chunk.id.in_(ids))
+        .all()
+    )
+    found = {chunk.id: (chunk, filename) for chunk, filename in rows}
+    out = []
+    for cid in ids:
+        if cid in found:
+            chunk, filename = found[cid]
+            out.append({"chunk_id": cid, "doc": filename, "loc": _loc(chunk.location)})
+    return out
+
+
+def _loc(location):
+    location = location or {}
+    if location.get("page") is not None:
+        return f"p.{location['page']}"
+    return str(location.get("section") or "")
 
 
 def _ensure_ids(deck: dict):

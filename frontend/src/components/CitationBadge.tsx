@@ -3,7 +3,7 @@ import { BookOpen, Loader2 } from "lucide-react";
 import type { Citation } from "../api/types";
 import { api } from "../api/client";
 
-export function CitationBadge({ citation }: { citation: Citation }) {
+export function CitationBadge({ citation, label: labelOverride }: { citation: Citation; label?: string }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -24,7 +24,7 @@ export function CitationBadge({ citation }: { citation: Citation }) {
     }
   };
 
-  const label = citation.loc || citation.doc || "source";
+  const label = labelOverride || citation.loc || citation.doc || "source";
 
   return (
     <span className="relative inline-block">

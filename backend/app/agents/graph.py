@@ -1,7 +1,8 @@
 # Wires the agent nodes into a LangGraph graph. The graph holds the control
 # flow and decides the order; the agents hand off through shared state and
 # never call each other. The router classifies the turn; answer and clarify
-# turns skip the build pipeline and go straight to respond.
+# turns skip the build pipeline and go to the QA agent, which replies in
+# chat with citations.
 
 from langgraph.graph import StateGraph, END
 
@@ -13,7 +14,7 @@ def build_graph(session):
     graph = StateGraph(TurnState)
 
     graph.add_node("router", lambda s: nodes.router(s, session))
-    graph.add_node("respond", lambda s: nodes.respond(s, session))
+    graph.add_node("qa", lambda s: nodes.qa(s, session))
     graph.add_node("revert", lambda s: nodes.revert(s, session))
     graph.add_node("planner", lambda s: nodes.planner(s, session))
     graph.add_node("builder", lambda s: nodes.builder(s, session))
@@ -24,7 +25,7 @@ def build_graph(session):
     graph.add_conditional_edges(
         "router",
         nodes.route_after_router,
-        {"planner": "planner", "respond": "respond", "revert": "revert"},
+        {"planner": "planner", "qa": "qa", "revert": "revert"},
     )
     graph.add_edge("planner", "builder")
     graph.add_edge("builder", "critic")
@@ -34,7 +35,7 @@ def build_graph(session):
         {"finalize": "finalize", "builder": "builder"},
     )
     graph.add_edge("finalize", END)
-    graph.add_edge("respond", END)
+    graph.add_edge("qa", END)
     graph.add_edge("revert", END)
 
     return graph.compile()

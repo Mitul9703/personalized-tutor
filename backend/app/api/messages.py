@@ -35,6 +35,8 @@ def list_messages(course_id: str, session: Session = Depends(get_session)):
             "text": m.text,
             "artifact_id": m.related_artifact_id,
             "version_id": m.related_version_id,
+            "citations": (m.citations or {}).get("items", []),
+            "uses_general_knowledge": (m.citations or {}).get("uses_general_knowledge", False),
         }
         for m in rows
     ]
@@ -67,9 +69,14 @@ def post_message(course_id: str, body: PostMessage, session: Session = Depends(g
     }
     result = graph.invoke(state)
 
-    # answer or clarify turns reply with no deck
+    # answer or clarify turns reply in chat with no deck
     if "final_version" not in result:
-        return {"intent": result.get("intent"), "reply": result.get("response")}
+        return {
+            "intent": result.get("intent"),
+            "reply": result.get("response"),
+            "citations": result.get("answer_citations", []),
+            "uses_general_knowledge": result.get("uses_general_knowledge", False),
+        }
 
     final = result["final_version"]
     return {

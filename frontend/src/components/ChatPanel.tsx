@@ -4,6 +4,7 @@ import { useStore } from "../store/useStore";
 import { CourseMap } from "./CourseMap";
 import { ChatInput } from "./ChatInput";
 import { LearnerProfileEditor } from "./LearnerProfileEditor";
+import { ChatAnswer } from "./ChatAnswer";
 import { cn } from "../lib/cn";
 
 export function ChatPanel() {
@@ -65,7 +66,11 @@ export function ChatPanel() {
                   : "border border-line bg-panel text-ink/80"
               )}
             >
-              {m.text}
+              {m.role === "system" ? (
+                <ChatAnswer text={m.text} citations={m.citations} usesGeneralKnowledge={m.usesGeneralKnowledge} />
+              ) : (
+                m.text
+              )}
             </div>
           </div>
         ))}
