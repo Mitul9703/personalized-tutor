@@ -1,9 +1,14 @@
 import type {
   ArtifactDetail,
+  Citation,
+  CreateQuizResponse,
   Deck,
   DeckRef,
   FlashcardResponse,
   Outline,
+  LearnerProfile,
+  OnboardingResponse,
+  QuizResult,
   TurnResponse,
 } from "./types";
 
@@ -19,6 +24,19 @@ async function unwrap<T>(res: Response): Promise<T> {
 }
 
 export const api = {
+  getCourse: (courseId: string) =>
+    fetch(`${BASE}/courses/${courseId}`).then(unwrap<{ course_id: string; title: string }>),
+
+  getOnboarding: (courseId: string) =>
+    fetch(`${BASE}/courses/${courseId}/onboarding`).then(unwrap<OnboardingResponse>),
+
+  saveOnboarding: (courseId: string, profile: LearnerProfile) =>
+    fetch(`${BASE}/courses/${courseId}/onboarding`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify(profile),
+    }).then(unwrap<OnboardingResponse>),
+
   createCourse: (title: string) =>
     fetch(`${BASE}/courses`, {
       method: "POST",
@@ -45,7 +63,14 @@ export const api = {
 
   listMessages: (courseId: string) =>
     fetch(`${BASE}/courses/${courseId}/messages`).then(
-      unwrap<Array<{ id: string; role: "learner" | "system"; text: string; artifact_id: string | null }>>
+      unwrap<Array<{
+        id: string;
+        role: "learner" | "system";
+        text: string;
+        artifact_id: string | null;
+        citations?: (Citation | null)[];
+        uses_general_knowledge?: boolean;
+      }>>
     ),
 
   listArtifacts: (courseId: string) =>
@@ -89,4 +114,18 @@ export const api = {
     fetch(`${BASE}/artifacts/${artifactId}/revert/${versionId}`, {
       method: "POST",
     }).then(unwrap<{ artifact_id: string; version_id: string; version_number: number; deck: Deck }>),
+
+  createQuiz: (courseId: string, topic: string) =>
+    fetch(`${BASE}/courses/${courseId}/quizzes`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ topic }),
+    }).then(unwrap<CreateQuizResponse>),
+
+  submitQuiz: (artifactId: string, answers: Record<string, string>, versionId?: string | null) =>
+    fetch(`${BASE}/artifacts/${artifactId}/quiz/submit`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ answers, version_id: versionId ?? null }),
+    }).then(unwrap<QuizResult>),
 };

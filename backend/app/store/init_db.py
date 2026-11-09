@@ -11,6 +11,10 @@ def init_db():
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.create_all(engine)
+    # create_all does not add columns to tables that already exist, so add
+    # newer columns here. safe to run more than once.
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE message ADD COLUMN IF NOT EXISTS citations JSONB"))
     print("database ready")
 
 

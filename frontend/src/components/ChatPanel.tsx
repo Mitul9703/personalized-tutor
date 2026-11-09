@@ -3,6 +3,8 @@ import { GraduationCap, Loader2, PanelRightOpen } from "lucide-react";
 import { useStore } from "../store/useStore";
 import { CourseMap } from "./CourseMap";
 import { ChatInput } from "./ChatInput";
+import { LearnerProfileEditor } from "./LearnerProfileEditor";
+import { ChatAnswer } from "./ChatAnswer";
 import { cn } from "../lib/cn";
 
 export function ChatPanel() {
@@ -13,6 +15,10 @@ export function ChatPanel() {
   const deck = useStore((s) => s.deck);
   const panelMode = useStore((s) => s.panelMode);
   const setPanelMode = useStore((s) => s.setPanelMode);
+  const profileError = useStore((s) => s.profileError);
+  const profileLoaded = useStore((s) => s.profileLoaded);
+  const profileLoading = useStore((s) => s.profileLoading);
+  const loadProfile = useStore((s) => s.loadProfile);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -26,6 +32,7 @@ export function ChatPanel() {
           <GraduationCap className="h-4 w-4" />
         </div>
         <span className="font-semibold">Personalized Tutor</span>
+        <div className="ml-auto"><LearnerProfileEditor /></div>
         {deck && panelMode === "closed" && (
           <button
             onClick={() => setPanelMode("split")}
@@ -39,6 +46,15 @@ export function ChatPanel() {
 
       <CourseMap />
 
+      {profileError && !profileLoaded && (
+        <div role="alert" className="mx-4 mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          <p>Your learner profile could not be loaded.</p>
+          <button disabled={profileLoading} onClick={() => void loadProfile()} className="mt-1 font-medium underline disabled:opacity-50">
+            {profileLoading ? "Loading…" : "Retry loading profile"}
+          </button>
+        </div>
+      )}
+
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {messages.map((m) => (
           <div key={m.id} className={cn("flex", m.role === "learner" ? "justify-end" : "justify-start")}>
@@ -50,7 +66,11 @@ export function ChatPanel() {
                   : "border border-line bg-panel text-ink/80"
               )}
             >
-              {m.text}
+              {m.role === "system" ? (
+                <ChatAnswer text={m.text} citations={m.citations} usesGeneralKnowledge={m.usesGeneralKnowledge} />
+              ) : (
+                m.text
+              )}
             </div>
           </div>
         ))}

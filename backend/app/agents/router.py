@@ -88,10 +88,16 @@ def route(session, course_id, request):
 
     system = (
         "You decide what a student wants from one chat message in a learning app. "
-        "Choose one intent: new_topic (teach something new), evolve (change an existing deck, for "
-        "example explain deeper, simplify, add an example, reorder, edit), revert (undo or go back to "
-        "an earlier version of a deck), answer (a plain question you can answer in chat with no deck), "
-        "or clarify (the request is unclear, ask one short question). "
+        "Choose one intent: new_topic (the student asks you to teach, cover, or make slides or a "
+        "lesson on something), evolve (change an existing deck, for example explain deeper, simplify, "
+        "add an example, reorder, edit), revert (undo or go back to an earlier version of a deck), "
+        "answer (a question that a chat reply can handle without building a deck, such as what does "
+        "X mean, how does X differ from Y, why does X happen, or a question about a slide), "
+        "or clarify (the request is unclear). "
+        "Building a deck is slow, so only pick new_topic when the student wants a lesson or slides, "
+        "not for a question they want answered. "
+        "A tutor agent writes the reply for answer and clarify, so leave message empty for those, "
+        "or use it for a short note on what you think they mean. "
         "Use list_decks to find which deck the student means, and list_versions to pick which version "
         "to revert to. For revert, put the chosen version_id in target. Then call finish."
     )

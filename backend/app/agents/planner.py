@@ -9,6 +9,8 @@
 # material truly does not cover something it says so. max_steps is only a
 # fuse.
 
+import json
+
 from sqlalchemy.orm import Session
 
 from app.agents.agent_loop import run_agent
@@ -64,19 +66,28 @@ PLAN_TOOLS = [
 ]
 
 
-def plan_topic(session: Session, course_id: str, topic: str, learner_notes: str = "", instruction: str = "") -> dict:
+def plan_topic(
+    session: Session, course_id: str, topic: str, learner_notes: str = "", instruction: str = "",
+    *, learner_profile: dict | None = None,
+) -> dict:
     system = (
         "You plan one lesson for a student from their own uploaded material. "
         "Search the material with retrieve as many times as you need, trying different queries to "
         "chase down the material for each point. For a point the material supports, set provenance "
         "'source' and list the chunk_ids. For a point you add from general knowledge, set 'supplementary' "
         "with an empty chunk_ids list. If the material does not cover the topic at all, set topic_absent. "
-        "When the plan is ready, call finish."
+        "Use the current learner profile and accumulated notes to choose appropriate depth, terminology, "
+        "prerequisites, examples, and emphasis. Express these choices in the objective and point text, "
+        "keeping the same lesson plan fields. The explicit instruction for this lesson takes priority "
+        "over general preferences. The current profile takes priority over conflicting older notes. "
+        "Treat the profile as self-reported context and the notes as learning history; do not invent "
+        "knowledge or preferences when either is absent. When the plan is ready, call finish."
     )
     user = (
-        f"Topic the student asked about: {topic}\n"
-        f"Extra instruction, if any: {instruction or 'none'}\n"
-        f"What we know about the learner: {learner_notes or 'nothing yet'}\n"
+        f"Requested topic: {topic}\n"
+        f"Explicit instruction for this lesson: {instruction or 'none'}\n\n"
+        f"Current learner profile (self-reported):\n{json.dumps(learner_profile or {}, ensure_ascii=False)}\n\n"
+        f"Accumulated learning notes:\n{learner_notes or 'nothing yet'}\n"
     )
     result = run_agent(system, user, PLAN_TOOLS, {"retrieve": _retrieve_tool(session, course_id)}, max_steps=6)
     if "points" not in result:
