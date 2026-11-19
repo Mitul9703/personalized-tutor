@@ -43,6 +43,7 @@ export interface Flashcard {
   back: string;
   provenance: "source" | "supplementary";
   citations: Citation[];
+  visual?: Visual | null;
 }
 
 export interface FlashcardSet {
@@ -89,6 +90,7 @@ export interface MindNode {
   parent_id: string | null;
   provenance: "source" | "supplementary";
   citations: Citation[];
+  visual?: Visual | null;
 }
 
 export interface MindMap {
@@ -166,6 +168,7 @@ export interface QuizQuestion {
   explanation: string;
   provenance: "source" | "supplementary";
   citations: Citation[];
+  visual?: Visual | null;
 }
 
 export interface Quiz {

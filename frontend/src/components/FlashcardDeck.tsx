@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Loader2, RefreshCw, Send, Sparkles } from "l
 import type { FlashcardSet } from "../api/types";
 import { CitationBadge } from "./CitationBadge";
 import { Markdown } from "./Markdown";
+import { Visual } from "./Visual";
 import { useStore } from "../store/useStore";
 import { cn } from "../lib/cn";
 
@@ -104,6 +105,8 @@ export function FlashcardDeck({ set, readOnly }: { set: FlashcardSet; readOnly: 
             </span>
           </motion.button>
         </AnimatePresence>
+
+        {card.visual && <Visual visual={card.visual} className="mx-auto mt-4 w-full max-w-2xl [&_svg]:max-h-[260px]" />}
 
         <div className="mx-auto mt-4 flex w-full max-w-2xl items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-1.5">

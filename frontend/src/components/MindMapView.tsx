@@ -3,6 +3,7 @@ import { Loader2, Send, Sparkles } from "lucide-react";
 import type { MindMap, MindNode } from "../api/types";
 import { CitationBadge } from "./CitationBadge";
 import { Markdown } from "./Markdown";
+import { Visual } from "./Visual";
 import { useStore } from "../store/useStore";
 import { cn } from "../lib/cn";
 
@@ -195,6 +196,7 @@ export function MindMapView({ map, readOnly }: { map: MindMap; readOnly: boolean
             <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-ink/40">Concept</div>
             <div className="mb-2 text-sm font-semibold text-ink/90">{selected.label}</div>
             {selected.detail && <Markdown className="mb-3 text-[13px] leading-relaxed text-ink/70">{selected.detail}</Markdown>}
+            {selected.visual && <Visual visual={selected.visual} className="mb-3 [&_svg]:max-h-[220px]" />}
             <div className="mb-2">
               {selected.provenance === "supplementary" ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">

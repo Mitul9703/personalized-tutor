@@ -4,6 +4,7 @@ import type { Grade, Quiz, QuizResult } from "../api/types";
 import { api } from "../api/client";
 import { CitationBadge } from "./CitationBadge";
 import { Markdown } from "./Markdown";
+import { Visual } from "./Visual";
 import { Button } from "./ui/Button";
 import { cn } from "../lib/cn";
 
@@ -77,6 +78,8 @@ export function QuizView({ quiz, artifactId, versionId }: {
                 )}
               </div>
               <Markdown className="mt-1 text-[15px] font-medium leading-relaxed">{q.stem}</Markdown>
+
+              {q.visual && <Visual visual={q.visual} className="mt-3 [&_svg]:max-h-[300px]" />}
 
               {q.kind === "mcq" ? (
                 <div className="mt-3 space-y-2">
