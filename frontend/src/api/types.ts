@@ -15,6 +15,12 @@ export interface Citation {
   loc?: string;
 }
 
+export interface Visual {
+  format: "svg" | "mermaid";
+  code: string;
+  caption?: string;
+}
+
 export interface Slide {
   id: string;
   heading: string;
@@ -23,6 +29,7 @@ export interface Slide {
   provenance: "source" | "supplementary";
   citations: Citation[];
   level?: "intro" | "standard" | "deep";
+  visual?: Visual | null;
 }
 
 export interface Deck {
@@ -58,6 +65,7 @@ export interface DocSection {
   body: string;
   provenance: "source" | "supplementary";
   citations: Citation[];
+  visual?: Visual | null;
 }
 
 export interface Doc {

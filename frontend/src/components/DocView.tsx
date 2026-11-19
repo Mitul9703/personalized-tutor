@@ -3,6 +3,7 @@ import { Loader2, Send, Sparkles } from "lucide-react";
 import type { Doc } from "../api/types";
 import { CitationBadge } from "./CitationBadge";
 import { Markdown } from "./Markdown";
+import { Visual } from "./Visual";
 import { useStore } from "../store/useStore";
 
 const QUICK_EDITS = ["Make it simpler", "Go deeper", "Add an example"];
@@ -45,6 +46,7 @@ export function DocView({ doc, readOnly }: { doc: Doc; readOnly: boolean }) {
                   )}
                 </div>
                 <Markdown className="text-[15px] leading-relaxed text-ink/80">{s.body}</Markdown>
+                {s.visual && <Visual visual={s.visual} className="mt-3 [&_svg]:max-h-[420px]" />}
                 {(s.citations.length > 0 || supplementary) && (
                   <div className="mt-3 flex flex-wrap items-center gap-1.5">
                     {s.citations.length > 0 ? (

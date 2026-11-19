@@ -3,6 +3,7 @@ import { MessageSquarePlus, Sparkles } from "lucide-react";
 import type { Slide } from "../api/types";
 import { CitationBadge } from "./CitationBadge";
 import { Markdown } from "./Markdown";
+import { Visual } from "./Visual";
 import { useStore } from "../store/useStore";
 import { cn } from "../lib/cn";
 
@@ -50,6 +51,8 @@ export function SlideView({ slide, index, total, readOnly }: {
           </li>
         ))}
       </ul>
+
+      {slide.visual && <Visual visual={slide.visual} className="mt-3 shrink-0 [&_svg]:max-h-40" />}
 
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-3">
         <div className="flex flex-wrap items-center gap-1.5">
