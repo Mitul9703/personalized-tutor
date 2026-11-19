@@ -113,7 +113,11 @@ def run_quiz_builder(session, course_id, *, plan, chunks, base_quiz, instruction
         "explanation text. Only mark a question 'supplementary' when the material does not "
         "cover it, and give it no chunk ids. Mix multiple choice (mcq) and open questions. For mcq, give "
         "plausible wrong options that reflect common misunderstandings, and make the answer exactly one of "
-        "the options. When editing, change only the questions the request is about. "
+        "the options. Write questions, options, and explanations in Markdown, and write any formula or "
+        "symbol as LaTeX math inline as $...$ (for example $x^2$ or $\\frac{dL}{dw}$) so it renders "
+        "properly. Across the quiz, spread the difficulty from simple recall to applying an idea, and make "
+        "the open questions ask the student to explain or work something through. "
+        "When editing, change only the questions the request is about. "
         "If a tool returns an error, fix the problem and call it again. Call finish when the quiz is ready."
     )
     user = _compose_task(plan, chunks, quiz, instruction, intent, issues)

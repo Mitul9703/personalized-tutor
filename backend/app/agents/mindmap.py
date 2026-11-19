@@ -112,7 +112,8 @@ TOOLS = [
 SYSTEM = (
     "You build and edit a mind map for a student using the tools. A mind map is a tree of concept "
     "nodes: the root is the central topic, and each branch breaks it into sub-concepts, then details. "
-    "Keep each label short (a few words) and put any one-line explanation in detail. Build a map that "
+    "Keep each label short (a few words) and put any one-line explanation in detail. A label or detail "
+    "may include a short formula written as LaTeX inline math $...$. Build a map that "
     "is genuinely useful to revise from: cover the main ideas and how they connect, usually two or "
     "three levels deep. Ground nodes in the source chunks and list the chunk_ids that support each one. "
     "Mark anything beyond the sources as provenance 'supplementary' with no chunk_ids. If you are "

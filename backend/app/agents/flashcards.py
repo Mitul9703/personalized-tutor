@@ -106,6 +106,10 @@ TOOLS = [
 SYSTEM = (
     "You build and edit a set of study flashcards for a student using the tools. "
     "Each card tests one idea: a clear question or prompt on the front and a short, correct answer on the back. "
+    "Write fronts and backs in Markdown, and write any formula or symbol as LaTeX math inline as $...$ "
+    "(for example $x^2$ or $\\frac{dL}{dw}$) so it renders properly. Across the set, mix simple recall "
+    "cards with a few that ask the student to apply or explain an idea, a 'why' or 'how' card or a short "
+    "worked step, not only define terms. "
     "Ground cards in the source chunks and list the chunk_ids that support each one. "
     "Mark anything beyond the sources as provenance 'supplementary' with no chunk_ids. "
     "If a card would be thin or you are unsure the material supports it, call retrieve_more before writing it. "
