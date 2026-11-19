@@ -27,3 +27,127 @@ body {
   background: #d9d6d1;
   border-radius: 6px;
 }
+
+/* markdown content written by the agents: emphasis, lists, code, and LaTeX
+   math. tailwind's preflight strips list and heading styles, so we restore the
+   ones the agents use. */
+.md {
+  line-height: 1.6;
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md p {
+  margin: 0 0 0.6em;
+}
+.md ul {
+  list-style: disc;
+  padding-left: 1.25em;
+  margin: 0.4em 0;
+}
+.md ol {
+  list-style: decimal;
+  padding-left: 1.4em;
+  margin: 0.4em 0;
+}
+.md li {
+  margin: 0.2em 0;
+}
+.md strong {
+  font-weight: 600;
+}
+.md em {
+  font-style: italic;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0.8em 0 0.4em;
+}
+.md h1 {
+  font-size: 1.3em;
+}
+.md h2 {
+  font-size: 1.15em;
+}
+.md h3 {
+  font-size: 1.05em;
+}
+.md a {
+  color: theme("colors.brand");
+  text-decoration: underline;
+}
+.md code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.md pre {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.75em 1em;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0.6em 0;
+}
+.md pre code {
+  background: none;
+  padding: 0;
+}
+.md blockquote {
+  border-left: 3px solid theme("colors.line");
+  padding-left: 0.8em;
+  margin: 0.6em 0;
+  color: rgba(0, 0, 0, 0.6);
+}
+.md table {
+  border-collapse: collapse;
+  margin: 0.6em 0;
+  font-size: 0.95em;
+}
+.md th,
+.md td {
+  border: 1px solid theme("colors.line");
+  padding: 0.35em 0.6em;
+  text-align: left;
+}
+.md th {
+  background: rgba(0, 0, 0, 0.03);
+  font-weight: 600;
+}
+.md .katex-display {
+  margin: 0.6em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* inline markdown: a single line (a bullet, a card face, a quiz stem) with no
+   block margins so it flows in its container. */
+.md-inline p {
+  margin: 0;
+  display: inline;
+}
+.md-inline strong {
+  font-weight: 600;
+}
+.md-inline em {
+  font-style: italic;
+}
+.md-inline code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.md-inline .katex-display {
+  display: inline;
+  margin: 0;
+}

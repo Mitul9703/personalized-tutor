@@ -3,6 +3,7 @@ import { CheckCircle2, CircleDashed, Loader2, Sparkles, XCircle } from "lucide-r
 import type { Grade, Quiz, QuizResult } from "../api/types";
 import { api } from "../api/client";
 import { CitationBadge } from "./CitationBadge";
+import { Markdown } from "./Markdown";
 import { Button } from "./ui/Button";
 import { cn } from "../lib/cn";
 
@@ -75,7 +76,7 @@ export function QuizView({ quiz, artifactId, versionId }: {
                   <span className="text-emerald-600">from your materials</span>
                 )}
               </div>
-              <div className="mt-1 text-[15px] font-medium leading-relaxed">{q.stem}</div>
+              <Markdown className="mt-1 text-[15px] font-medium leading-relaxed">{q.stem}</Markdown>
 
               {q.kind === "mcq" ? (
                 <div className="mt-3 space-y-2">
@@ -95,7 +96,7 @@ export function QuizView({ quiz, artifactId, versionId }: {
                         checked={answers[q.id] === opt}
                         onChange={() => setAnswers((a) => ({ ...a, [q.id]: opt }))}
                       />
-                      <span>{opt}</span>
+                      <Markdown inline className="min-w-0 flex-1">{opt}</Markdown>
                     </label>
                   ))}
                 </div>
@@ -116,9 +117,11 @@ export function QuizView({ quiz, artifactId, versionId }: {
                     <v.icon className="h-4 w-4" />
                     {v.label}
                   </div>
-                  <div className="leading-relaxed">{grade.feedback}</div>
+                  <Markdown className="leading-relaxed">{grade.feedback}</Markdown>
                   {grade.verdict !== "right" && (
-                    <div className="mt-2 text-xs opacity-80">Correct answer: {q.answer}</div>
+                    <div className="mt-2 text-xs opacity-80">
+                      Correct answer: <Markdown inline className="inline">{q.answer}</Markdown>
+                    </div>
                   )}
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     {grade.citations.length > 0 ? (

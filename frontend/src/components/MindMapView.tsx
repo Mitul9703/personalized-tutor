@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2, Send, Sparkles } from "lucide-react";
 import type { MindMap, MindNode } from "../api/types";
 import { CitationBadge } from "./CitationBadge";
+import { Markdown } from "./Markdown";
 import { useStore } from "../store/useStore";
 import { cn } from "../lib/cn";
 
@@ -127,9 +128,9 @@ export function MindMapView({ map, readOnly }: { map: MindMap; readOnly: boolean
                       n.id === selectedId && isRoot ? "ring-2 ring-brand/40" : ""
                     )}
                   >
-                    <span className={cn("line-clamp-2 text-xs font-semibold", isRoot ? "text-white" : "text-ink/80")}>
+                    <Markdown inline className={cn("line-clamp-2 text-xs font-semibold", isRoot ? "text-white" : "text-ink/80")}>
                       {n.label}
-                    </span>
+                    </Markdown>
                     {!isRoot && (
                       <span className="mt-0.5 flex items-center gap-1 text-[9px]">
                         {supplementary ? (
@@ -193,7 +194,7 @@ export function MindMapView({ map, readOnly }: { map: MindMap; readOnly: boolean
           <>
             <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-ink/40">Concept</div>
             <div className="mb-2 text-sm font-semibold text-ink/90">{selected.label}</div>
-            {selected.detail && <p className="mb-3 text-[13px] leading-relaxed text-ink/70">{selected.detail}</p>}
+            {selected.detail && <Markdown className="mb-3 text-[13px] leading-relaxed text-ink/70">{selected.detail}</Markdown>}
             <div className="mb-2">
               {selected.provenance === "supplementary" ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">

@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Loader2, RefreshCw, Send, Sparkles } from "lucide-react";
 import type { FlashcardSet } from "../api/types";
 import { CitationBadge } from "./CitationBadge";
+import { Markdown } from "./Markdown";
 import { useStore } from "../store/useStore";
 import { cn } from "../lib/cn";
 
@@ -58,7 +59,7 @@ export function FlashcardDeck({ set, readOnly }: { set: FlashcardSet; readOnly: 
               <span>{i + 1}</span>
               {c.provenance === "supplementary" && <span className="text-amber-500">◆</span>}
             </div>
-            <div className="line-clamp-2 text-[11px] font-medium text-ink/70">{c.front}</div>
+            <Markdown inline className="line-clamp-2 text-[11px] font-medium text-ink/70">{c.front}</Markdown>
           </button>
         ))}
       </div>
@@ -94,9 +95,9 @@ export function FlashcardDeck({ set, readOnly }: { set: FlashcardSet; readOnly: 
             <span className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-ink/40">
               {flipped ? "Answer" : "Question"}
             </span>
-            <span className={cn("leading-relaxed text-ink/90", flipped ? "text-lg" : "text-2xl font-semibold")}>
+            <Markdown inline className={cn("leading-relaxed text-ink/90", flipped ? "text-lg" : "text-2xl font-semibold")}>
               {flipped ? card.back : card.front}
-            </span>
+            </Markdown>
             <span className="mt-6 inline-flex items-center gap-1 text-[11px] text-ink/40">
               <RefreshCw className="h-3 w-3" />
               click to flip

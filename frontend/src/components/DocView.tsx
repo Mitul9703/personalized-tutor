@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Loader2, Send, Sparkles } from "lucide-react";
 import type { Doc } from "../api/types";
 import { CitationBadge } from "./CitationBadge";
+import { Markdown } from "./Markdown";
 import { useStore } from "../store/useStore";
 
 const QUICK_EDITS = ["Make it simpler", "Go deeper", "Add an example"];
@@ -43,7 +44,7 @@ export function DocView({ doc, readOnly }: { doc: Doc; readOnly: boolean }) {
                     <span className="shrink-0 text-[11px] text-emerald-600">from your materials</span>
                   )}
                 </div>
-                <div className="whitespace-pre-line text-[15px] leading-relaxed text-ink/80">{s.body}</div>
+                <Markdown className="text-[15px] leading-relaxed text-ink/80">{s.body}</Markdown>
                 {(s.citations.length > 0 || supplementary) && (
                   <div className="mt-3 flex flex-wrap items-center gap-1.5">
                     {s.citations.length > 0 ? (

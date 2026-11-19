@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { MessageSquarePlus, Sparkles } from "lucide-react";
 import type { Slide } from "../api/types";
 import { CitationBadge } from "./CitationBadge";
+import { Markdown } from "./Markdown";
 import { useStore } from "../store/useStore";
 import { cn } from "../lib/cn";
 
@@ -45,7 +46,7 @@ export function SlideView({ slide, index, total, readOnly }: {
         {slide.bullets.map((b, i) => (
           <li key={i} className="flex gap-3 text-[15px] leading-relaxed text-ink/80">
             <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand/60" />
-            <span>{b}</span>
+            <Markdown inline className="min-w-0 flex-1">{b}</Markdown>
           </li>
         ))}
       </ul>
@@ -77,7 +78,7 @@ export function SlideView({ slide, index, total, readOnly }: {
           <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-ink/50">
             Go deeper
           </summary>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink/70">{slide.notes}</p>
+          <Markdown className="mt-2 text-sm leading-relaxed text-ink/70">{slide.notes}</Markdown>
         </details>
       )}
     </motion.div>
