@@ -14,6 +14,7 @@
 import json
 
 from app.agents.agent_loop import run_agent
+from app.agents.visuals import VISUAL_SCHEMA, clean_visual
 from app.ingest.retrieve import retrieve
 from app.store.models import Chunk, Document
 
@@ -34,6 +35,7 @@ _QUESTION_SCHEMA = {
             "items": {"type": "string"},
             "description": "the chunk ids that back the answer and explanation",
         },
+        "visual": VISUAL_SCHEMA,
     },
     "required": ["stem", "answer", "explanation", "provenance"],
 }
@@ -117,6 +119,8 @@ def run_quiz_builder(session, course_id, *, plan, chunks, base_quiz, instruction
         "symbol as LaTeX math inline as $...$ (for example $x^2$ or $\\frac{dL}{dw}$) so it renders "
         "properly. Across the quiz, spread the difficulty from simple recall to applying an idea, and make "
         "the open questions ask the student to explain or work something through. "
+        "When a question is about a diagram or a process, you may attach a visual to it (Mermaid for a "
+        "flow, or a small self-contained SVG), kept simple and only when it genuinely helps the question. "
         "When editing, change only the questions the request is about. "
         "If a tool returns an error, fix the problem and call it again. Call finish when the quiz is ready."
     )
@@ -225,6 +229,7 @@ def _build_question(session, course_id, q, default_id):
         "explanation": q.get("explanation", ""),
         "provenance": provenance,
         "citations": citations if provenance == "source" else [],
+        "visual": clean_visual(q.get("visual")),
     }, None
 
 

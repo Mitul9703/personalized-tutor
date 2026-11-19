@@ -18,6 +18,7 @@
 import json
 
 from app.agents.agent_loop import run_agent
+from app.agents.visuals import VISUAL_SCHEMA, clean_visual
 from app.ingest.retrieve import retrieve
 from app.store.models import Chunk, Document, LearnerModel
 
@@ -34,6 +35,7 @@ _CARD_SCHEMA = {
             "type": "array", "items": {"type": "string"},
             "description": "ids of the source chunks that support this card. Empty for supplementary cards.",
         },
+        "visual": VISUAL_SCHEMA,
     },
     "required": ["front", "back", "provenance"],
 }
@@ -74,6 +76,7 @@ TOOLS = [
                 "back": {"type": "string"},
                 "provenance": {"type": "string", "enum": ["source", "supplementary"]},
                 "chunk_ids": {"type": "array", "items": {"type": "string"}},
+                "visual": VISUAL_SCHEMA,
             },
             "required": ["card_id"],
         },
@@ -110,6 +113,8 @@ SYSTEM = (
     "(for example $x^2$ or $\\frac{dL}{dw}$) so it renders properly. Across the set, mix simple recall "
     "cards with a few that ask the student to apply or explain an idea, a 'why' or 'how' card or a short "
     "worked step, not only define terms. "
+    "A card may carry a small diagram (Mermaid or a self-contained SVG) when a picture helps its answer, "
+    "but keep most cards plain text and add a visual only when it genuinely helps. "
     "Ground cards in the source chunks and list the chunk_ids that support each one. "
     "Mark anything beyond the sources as provenance 'supplementary' with no chunk_ids. "
     "If a card would be thin or you are unsure the material supports it, call retrieve_more before writing it. "
@@ -178,7 +183,7 @@ def _for_model(cards):
         "title": cards.get("title", ""),
         "cards": [
             {"id": c["id"], "front": c["front"], "back": c["back"], "provenance": c["provenance"],
-             "chunk_ids": [x["chunk_id"] for x in c.get("citations", [])]}
+             "chunk_ids": [x["chunk_id"] for x in c.get("citations", [])], "visual": c.get("visual")}
             for c in cards.get("cards", [])
         ],
     }
@@ -230,6 +235,7 @@ def _handle(name, args, cards, session, course_id):
             "provenance": args["provenance"] if args.get("provenance") is not None else card["provenance"],
             "chunk_ids": (args["chunk_ids"] if args.get("chunk_ids") is not None
                           else [c["chunk_id"] for c in card.get("citations", [])]),
+            "visual": args["visual"] if args.get("visual") is not None else card.get("visual"),
         }
         new_card, error = _build_card(session, course_id, merged, card["id"])
         if error:
@@ -274,6 +280,7 @@ def _build_card(session, course_id, raw, default_id):
         "back": raw["back"],
         "provenance": provenance,
         "citations": citations,
+        "visual": clean_visual(raw.get("visual")),
     }, None
 
 

@@ -20,6 +20,7 @@
 import json
 
 from app.agents.agent_loop import run_agent
+from app.agents.visuals import VISUAL_SCHEMA, clean_visual
 from app.ingest.retrieve import retrieve
 from app.store.models import Chunk, Document, LearnerModel
 
@@ -40,6 +41,7 @@ _NODE_SCHEMA = {
             "type": "array", "items": {"type": "string"},
             "description": "ids of the source chunks that support this node. Empty for supplementary nodes.",
         },
+        "visual": VISUAL_SCHEMA,
     },
     "required": ["label", "provenance"],
 }
@@ -80,6 +82,7 @@ TOOLS = [
                 "parent_id": {"type": "string"},
                 "provenance": {"type": "string", "enum": ["source", "supplementary"]},
                 "chunk_ids": {"type": "array", "items": {"type": "string"}},
+                "visual": VISUAL_SCHEMA,
             },
             "required": ["node_id"],
         },
@@ -113,7 +116,9 @@ SYSTEM = (
     "You build and edit a mind map for a student using the tools. A mind map is a tree of concept "
     "nodes: the root is the central topic, and each branch breaks it into sub-concepts, then details. "
     "Keep each label short (a few words) and put any one-line explanation in detail. A label or detail "
-    "may include a short formula written as LaTeX inline math $...$. Build a map that "
+    "may include a short formula written as LaTeX inline math $...$. A node may also carry a small "
+    "diagram (Mermaid or a self-contained SVG) when a picture helps that concept; add one only where it "
+    "genuinely helps, not on every node. Build a map that "
     "is genuinely useful to revise from: cover the main ideas and how they connect, usually two or "
     "three levels deep. Ground nodes in the source chunks and list the chunk_ids that support each one. "
     "Mark anything beyond the sources as provenance 'supplementary' with no chunk_ids. If you are "
@@ -182,7 +187,7 @@ def _for_model(mind):
         "nodes": [
             {"id": n["id"], "label": n["label"], "detail": n.get("detail", ""),
              "parent_id": n.get("parent_id"), "provenance": n["provenance"],
-             "chunk_ids": [x["chunk_id"] for x in n.get("citations", [])]}
+             "chunk_ids": [x["chunk_id"] for x in n.get("citations", [])], "visual": n.get("visual")}
             for n in mind.get("nodes", [])
         ],
     }
@@ -249,6 +254,7 @@ def _handle(name, args, mind, session, course_id):
             "provenance": args["provenance"] if args.get("provenance") is not None else node["provenance"],
             "chunk_ids": (args["chunk_ids"] if args.get("chunk_ids") is not None
                           else [c["chunk_id"] for c in node.get("citations", [])]),
+            "visual": args["visual"] if args.get("visual") is not None else node.get("visual"),
         }
         new_node, error = _build_node(session, course_id, merged, node["id"])
         if error:
@@ -302,6 +308,7 @@ def _build_node(session, course_id, raw, default_id):
         "parent_id": parent if parent else None,
         "provenance": provenance,
         "citations": citations,
+        "visual": clean_visual(raw.get("visual")),
     }, None
 
 
