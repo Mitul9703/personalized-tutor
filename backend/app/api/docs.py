@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.agents.critic import review as critic_review
+from app.agents.critic import review_doc
 from app.agents.doc import run_doc_builder
 from app.agents.memory import update_notes
 from app.agents.planner import plan_topic
@@ -59,15 +59,13 @@ def create_doc(course_id: str, body: CreateDoc, session: Session = Depends(get_s
     )
     report = {}
     for attempt in range(MAX_DOC_ATTEMPTS):
-        report = _review_doc(session, course_id, doc)
+        report = review_doc(session, course_id, doc)
         if report.get("passed", True) or attempt + 1 >= MAX_DOC_ATTEMPTS:
             break
-        issues = [{"section_id": i.get("slide_id"), "problem": i.get("problem")}
-                  for i in report.get("issues", [])]
         doc = run_doc_builder(
             session, course_id,
             plan=plan, chunks=chunks, base_deck=doc,
-            instruction=request, intent="new_topic", issues=issues,
+            instruction=request, intent="new_topic", issues=report["issues"],
         )
 
     if not doc.get("sections"):
@@ -137,21 +135,6 @@ def edit_doc(artifact_id: str, body: EditDoc, session: Session = Depends(get_ses
 
     update_notes(session, course_id, body.instruction, artifact.title)
     return _response(artifact, version, doc, "evolve")
-
-
-def _review_doc(session, course_id, doc):
-    # the Critic checks slide decks. A doc section maps cleanly onto a slide
-    # (a heading plus a body), so we show the critic a slide-shaped view and
-    # reuse it unchanged. The issues come back keyed by the section id.
-    pseudo = {
-        "title": doc.get("title", ""),
-        "slides": [
-            {"id": s["id"], "heading": s.get("heading", ""), "bullets": [s.get("body", "")],
-             "provenance": s.get("provenance", "source"), "citations": s.get("citations", [])}
-            for s in doc.get("sections", [])
-        ],
-    }
-    return critic_review(session, course_id, pseudo)
 
 
 def _notes(session, course_id):

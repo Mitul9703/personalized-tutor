@@ -6,7 +6,11 @@
 from app.agents import router as router_agent
 from app.agents.planner import plan_topic
 from app.agents.builder import run_builder
-from app.agents.critic import review
+from app.agents.doc import run_doc_builder
+from app.agents.mindmap import run_mindmap_builder
+from app.agents.flashcards import run_flashcard_builder
+from app.agents.quiz_builder import run_quiz_builder
+from app.agents.critic import review, review_doc
 from app.agents.memory import update_notes
 from app.agents.qa import answer as answer_question
 from app.store.versioning import revert_to
@@ -21,6 +25,10 @@ def router(state: dict, session) -> dict:
     out = {"intent": decision.get("intent", "new_topic"),
            "target": decision.get("target", {}),
            "retries": 0}
+    # the kind (slides, doc, mindmap, quiz, flashcards) only applies when
+    # building something new; an edit keeps the artifact's own kind.
+    if out["intent"] == "new_topic":
+        out["kind"] = decision.get("kind", "slides")
     if decision.get("message"):
         out["response"] = decision["message"]
     return out
@@ -132,9 +140,11 @@ def planner(state: dict, session) -> dict:
 
 
 def builder(state: dict, session) -> dict:
-    # render or edit the deck on a working copy. on a retry it starts from
-    # the last draft and gets the critic notes to fix the problems.
+    # render or edit the artifact on a working copy. the kind decides which
+    # generator runs; every generator takes the same arguments. on a retry it
+    # starts from the last draft and gets the critic notes to fix the problems.
     intent = state["intent"]
+    kind = _kind(state, session)
     retries = state.get("retries", 0) + 1
     report = state.get("critic_report") or {}
     issues = report.get("issues") if not report.get("passed", True) else None
@@ -148,21 +158,30 @@ def builder(state: dict, session) -> dict:
     else:
         base = None
 
-    deck = run_builder(
-        session,
-        state["course_id"],
+    deck = _run_generator(
+        kind, session, state["course_id"],
         plan=state.get("plan_slice", {}),
         chunks=state.get("retrieved_chunks", []),
-        base_deck=base,
+        base=base,
         instruction=state["request"]["text"],
         intent=intent,
         issues=issues,
     )
-    return {"draft_deck": deck, "retries": retries}
+    return {"draft_deck": deck, "retries": retries, "kind": kind}
 
 
 def critic(state: dict, session) -> dict:
-    report = review(session, state["course_id"], state.get("draft_deck", {}))
+    # only the prose types run the LLM critic: slides, and docs through a
+    # section-to-slide adapter. the other types rely on the mechanical grounding
+    # checks their generators already enforce, so they pass straight through.
+    kind = state.get("kind", "slides")
+    draft = state.get("draft_deck", {})
+    if kind == "doc":
+        report = review_doc(session, state["course_id"], draft)
+    elif kind == "slides":
+        report = review(session, state["course_id"], draft)
+    else:
+        report = {"passed": True, "issues": []}
     return {"critic_report": report}
 
 
@@ -199,7 +218,7 @@ def finalize(state: dict, session) -> dict:
         )
         session.add(unit)
         session.commit()
-        artifact = Artifact(study_unit_id=unit.id, type="slides", title=unit.topic)
+        artifact = Artifact(study_unit_id=unit.id, type=state.get("kind", "slides"), title=unit.topic)
         session.add(artifact)
         session.commit()
         version = ArtifactVersion(
@@ -231,8 +250,34 @@ def finalize(state: dict, session) -> dict:
         "artifact_id": artifact.id,
         "version_id": version.id,
         "version_number": version.version_number,
+        "type": artifact.type,
         "content": deck,
     }}
+
+
+def _run_generator(kind, session, course_id, *, plan, chunks, base, instruction, intent, issues):
+    # every content type has a generator with the same shape. quiz takes the
+    # keyword base_quiz, the rest take base_deck; otherwise the call is identical.
+    common = dict(plan=plan, chunks=chunks, instruction=instruction, intent=intent, issues=issues)
+    if kind == "doc":
+        return run_doc_builder(session, course_id, base_deck=base, **common)
+    if kind == "mindmap":
+        return run_mindmap_builder(session, course_id, base_deck=base, **common)
+    if kind == "flashcards":
+        return run_flashcard_builder(session, course_id, base_deck=base, **common)
+    if kind == "quiz":
+        return run_quiz_builder(session, course_id, base_quiz=base, **common)
+    return run_builder(session, course_id, base_deck=base, **common)
+
+
+def _kind(state: dict, session) -> str:
+    # for an edit, keep the artifact's own kind; otherwise use the kind the
+    # router chose for this new build, defaulting to slides.
+    if state.get("intent") == "evolve":
+        artifact = session.get(Artifact, _artifact_id(state))
+        if artifact:
+            return artifact.type
+    return state.get("kind") or "slides"
 
 
 def _artifact_id(state: dict) -> str:

@@ -9,6 +9,7 @@ class TurnState(TypedDict, total=False):
     course_id: str
     request: dict          # text, artifact_id, target_slide_ids
     intent: str            # new_topic, evolve, answer, or clarify
+    kind: str              # slides, doc, mindmap, quiz, flashcards (new_topic)
     target: dict           # artifact_id, slide_ids, topic, set by the router
     response: str          # reply text for answer or clarify turns
     answer_citations: list # {chunk_id, doc, loc} per [n] marker in response

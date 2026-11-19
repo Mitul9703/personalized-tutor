@@ -123,6 +123,7 @@ export interface TurnResponse {
   intent: string;
   reply?: string;
   artifact_id?: string;
+  type?: string;
   version_id?: string;
   version_number?: number;
   deck?: Deck;

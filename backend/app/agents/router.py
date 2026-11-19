@@ -34,6 +34,11 @@ TOOLS = [
                     "type": "string",
                     "enum": ["new_topic", "evolve", "revert", "answer", "clarify"],
                 },
+                "kind": {
+                    "type": "string",
+                    "enum": ["slides", "doc", "mindmap", "quiz", "flashcards"],
+                    "description": "For new_topic only: which kind of content to build. Default slides.",
+                },
                 "target": {
                     "type": "object",
                     "description": "For evolve: artifact_id and slide_ids. For revert: artifact_id and version_id. For new_topic: topic.",
@@ -88,14 +93,23 @@ def route(session, course_id, request):
 
     system = (
         "You decide what a student wants from one chat message in a learning app. "
-        "Choose one intent: new_topic (the student asks you to teach, cover, or make slides or a "
-        "lesson on something), evolve (change an existing deck, for example explain deeper, simplify, "
-        "add an example, reorder, edit), revert (undo or go back to an earlier version of a deck), "
-        "answer (a question that a chat reply can handle without building a deck, such as what does "
+        "Choose one intent: "
+        "new_topic (the student wants you to BUILD a piece of study content on a topic: a lesson or "
+        "slides, a written doc, a mind map, a quiz, or flashcards), "
+        "evolve (change an existing artifact, for example explain deeper, simplify, add an example, "
+        "reorder, edit, add a branch), "
+        "revert (undo or go back to an earlier version of an artifact), "
+        "answer (a question that a chat reply can handle without building anything, such as what does "
         "X mean, how does X differ from Y, why does X happen, or a question about a slide), "
         "or clarify (the request is unclear). "
-        "Building a deck is slow, so only pick new_topic when the student wants a lesson or slides, "
-        "not for a question they want answered. "
+        "When the intent is new_topic, also choose kind, the type of content to build: "
+        "slides for a lesson or slides or a plain 'teach me / explain / cover X' (this is the default); "
+        "doc for a written doc, notes, a summary, an article, or something to read; "
+        "mindmap for a mind map or concept map of how ideas connect; "
+        "quiz for a quiz, a test, or practice questions; "
+        "flashcards for flashcards or cards to memorise. "
+        "Building content is slower than a chat answer, so only pick new_topic when the student "
+        "actually wants an artifact built, not for a question they want answered in chat. "
         "A tutor agent writes the reply for answer and clarify, so leave message empty for those, "
         "or use it for a short note on what you think they mean. "
         "Use list_decks to find which deck the student means, and list_versions to pick which version "

@@ -101,3 +101,26 @@ def review(session, course_id, deck: dict) -> dict:
         result = {"passed": True, "issues": []}
     result.setdefault("issues", [])
     return result
+
+
+def review_doc(session, course_id, doc: dict) -> dict:
+    # a doc is long-form prose, where an unsupported claim hides most easily,
+    # so it is reviewed like slides. A doc section maps onto a slide (a heading
+    # plus a body), so we show the critic a slide-shaped view and reuse review
+    # unchanged. The issues come back keyed by slide_id, which is the section
+    # id; we rename it to section_id so the doc generator's fixes land on the
+    # right section.
+    pseudo = {
+        "title": doc.get("title", ""),
+        "slides": [
+            {"id": s["id"], "heading": s.get("heading", ""), "bullets": [s.get("body", "")],
+             "provenance": s.get("provenance", "source"), "citations": s.get("citations", [])}
+            for s in doc.get("sections", [])
+        ],
+    }
+    report = review(session, course_id, pseudo)
+    report["issues"] = [
+        {"section_id": i.get("slide_id"), "problem": i.get("problem")}
+        for i in report.get("issues", [])
+    ]
+    return report

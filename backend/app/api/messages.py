@@ -82,6 +82,7 @@ def post_message(course_id: str, body: PostMessage, session: Session = Depends(g
     return {
         "intent": result.get("intent"),
         "artifact_id": final["artifact_id"],
+        "type": final.get("type"),
         "version_id": final["version_id"],
         "version_number": final["version_number"],
         "deck": final["content"],
