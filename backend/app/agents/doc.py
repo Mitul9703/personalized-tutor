@@ -18,6 +18,7 @@
 import json
 
 from app.agents.agent_loop import run_agent
+from app.agents.visuals import VISUAL_SCHEMA, clean_visual
 from app.ingest.retrieve import retrieve
 from app.store.models import Chunk, Document, LearnerModel
 
@@ -37,6 +38,7 @@ _SECTION_SCHEMA = {
             "type": "array", "items": {"type": "string"},
             "description": "ids of the source chunks that support this section. Empty for supplementary sections.",
         },
+        "visual": VISUAL_SCHEMA,
     },
     "required": ["heading", "body", "provenance"],
 }
@@ -77,6 +79,7 @@ TOOLS = [
                 "body": {"type": "string"},
                 "provenance": {"type": "string", "enum": ["source", "supplementary"]},
                 "chunk_ids": {"type": "array", "items": {"type": "string"}},
+                "visual": VISUAL_SCHEMA,
             },
             "required": ["section_id"],
         },
@@ -125,6 +128,9 @@ SYSTEM = (
     "inline as $...$ and as $$...$$ on its own line for an important one, so it renders as real math. "
     "Teach with worked examples: when there is a formula or procedure, walk through a short "
     "step-by-step example using the actual numbers from the material. "
+    "When a diagram would make a section clearer, attach a visual to it: use Mermaid for a process, "
+    "cycle, or how parts connect, or a small self-contained SVG for a labelled, coloured diagram. Keep "
+    "it accurate to the material and captioned, and add one only where it genuinely helps. "
     "Ground sections in the source chunks and list the chunk_ids that support each one. Do not write "
     "chunk ids, citation markers, or '[Source: ...]' tags in the body text; the app records grounding "
     "separately from the chunk_ids you list. Mark anything "
@@ -193,7 +199,7 @@ def _for_model(doc):
         "title": doc.get("title", ""),
         "sections": [
             {"id": s["id"], "heading": s["heading"], "body": s["body"], "provenance": s["provenance"],
-             "chunk_ids": [x["chunk_id"] for x in s.get("citations", [])]}
+             "chunk_ids": [x["chunk_id"] for x in s.get("citations", [])], "visual": s.get("visual")}
             for s in doc.get("sections", [])
         ],
     }
@@ -245,6 +251,7 @@ def _handle(name, args, doc, session, course_id):
             "provenance": args["provenance"] if args.get("provenance") is not None else section["provenance"],
             "chunk_ids": (args["chunk_ids"] if args.get("chunk_ids") is not None
                           else [c["chunk_id"] for c in section.get("citations", [])]),
+            "visual": args["visual"] if args.get("visual") is not None else section.get("visual"),
         }
         new_section, error = _build_section(session, course_id, merged, section["id"])
         if error:
@@ -297,6 +304,7 @@ def _build_section(session, course_id, raw, default_id):
         "body": raw["body"],
         "provenance": provenance,
         "citations": citations,
+        "visual": clean_visual(raw.get("visual")),
     }, None
 
 

@@ -12,6 +12,7 @@
 import json
 
 from app.agents.agent_loop import run_agent
+from app.agents.visuals import VISUAL_SCHEMA, clean_visual
 from app.ingest.retrieve import retrieve
 from app.store.models import Chunk, Document
 
@@ -38,6 +39,7 @@ _SLIDE_SCHEMA = {
             },
         },
         "level": {"type": "string", "enum": ["intro", "standard", "deep"]},
+        "visual": VISUAL_SCHEMA,
     },
     "required": ["heading", "bullets", "provenance"],
 }
@@ -80,6 +82,7 @@ TOOLS = [
                 "provenance": {"type": "string", "enum": ["source", "supplementary"]},
                 "citations": {"type": "array", "items": {"type": "object"}},
                 "level": {"type": "string", "enum": ["intro", "standard", "deep"]},
+                "visual": VISUAL_SCHEMA,
             },
             "required": ["slide_id"],
         },
@@ -145,6 +148,10 @@ def run_builder(session, course_id, *, plan, chunks, base_deck, instruction, int
         "every formula, equation, or symbol as LaTeX math, inline as $...$ (for example $x^2$, "
         "$\\frac{dL}{dw}$, or $a_{t+1}$) and as $$...$$ on its own line for an important equation, "
         "so it renders as real math instead of plain text. "
+        "When a diagram would genuinely help, attach a visual to the slide: use Mermaid for a process, "
+        "cycle, or how things connect (a flowchart or graph), or a small self-contained SVG for a "
+        "labelled, coloured diagram. Keep it simple, accurate to the material, and captioned, and add "
+        "one only when it adds understanding, not for decoration. "
         "Give every slide a notes field with the deeper explanation, reasoning, or a worked example "
         "that walks through the steps behind its bullets, so the student can expand it to go further; "
         "keep the notes consistent with the cited material. Follow the lesson plan's depth and "
@@ -220,6 +227,8 @@ def _handle(name, args, deck, session, course_id):
             slide["bullets"] = args["bullets"]
         if args.get("citations") is not None:
             slide["citations"] = _resolve_citations(session, course_id, args["citations"])
+        if args.get("visual") is not None:
+            slide["visual"] = clean_visual(args["visual"])
         return {"ok": True}
 
     if name == "delete_slide":
@@ -256,6 +265,7 @@ def _norm_slide(slide: dict, index: int, session, course_id) -> dict:
         "provenance": slide.get("provenance", "source"),
         "citations": _resolve_citations(session, course_id, slide.get("citations", [])),
         "level": slide.get("level", "standard"),
+        "visual": clean_visual(slide.get("visual")),
     }
 
 

@@ -13,6 +13,13 @@ class Citation(BaseModel):
     loc: str            # where in the file, like "p.4" or a section name
 
 
+class Visual(BaseModel):
+    # an optional agent-authored diagram for a slide or doc section.
+    format: Literal["svg", "mermaid"]
+    code: str           # mermaid source, or a complete <svg> element
+    caption: str = ""
+
+
 class Slide(BaseModel):
     id: str
     heading: str
@@ -21,6 +28,7 @@ class Slide(BaseModel):
     provenance: Literal["source", "supplementary"] = "source"
     citations: list[Citation] = Field(default_factory=list)
     level: Literal["intro", "standard", "deep"] = "standard"
+    visual: Visual | None = None
 
 
 class Deck(BaseModel):

@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.schemas.slide import Citation
+from app.schemas.slide import Citation, Visual
 
 
 class DocSection(BaseModel):
@@ -17,6 +17,7 @@ class DocSection(BaseModel):
     body: str = ""      # the prose for this section, a few short paragraphs
     provenance: Literal["source", "supplementary"] = "source"
     citations: list[Citation] = Field(default_factory=list)
+    visual: Visual | None = None
 
 
 class Doc(BaseModel):
