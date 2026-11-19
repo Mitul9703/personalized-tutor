@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.agents.critic import review_doc
+from app.agents.critic import review_doc, verify_revise
 from app.agents.doc import run_doc_builder
 from app.agents.memory import update_notes
 from app.agents.planner import plan_topic
@@ -27,8 +27,6 @@ from app.store.models import (
 )
 
 router = APIRouter()
-
-MAX_DOC_ATTEMPTS = 2  # one write, then at most one revise on a critic fail
 
 
 class CreateDoc(BaseModel):
@@ -52,21 +50,14 @@ def create_doc(course_id: str, body: CreateDoc, session: Session = Depends(get_s
     chunks = _plan_chunks(session, plan)
 
     # write, verify, and revise once if the critic flags a grounding problem
-    doc = run_doc_builder(
-        session, course_id,
-        plan=plan, chunks=chunks, base_deck=None,
-        instruction=request, intent="new_topic",
-    )
-    report = {}
-    for attempt in range(MAX_DOC_ATTEMPTS):
-        report = review_doc(session, course_id, doc)
-        if report.get("passed", True) or attempt + 1 >= MAX_DOC_ATTEMPTS:
-            break
-        doc = run_doc_builder(
+    def build(base, issues):
+        return run_doc_builder(
             session, course_id,
-            plan=plan, chunks=chunks, base_deck=doc,
-            instruction=request, intent="new_topic", issues=report["issues"],
+            plan=plan, chunks=chunks, base_deck=base,
+            instruction=request, intent="new_topic", issues=issues,
         )
+
+    doc, report = verify_revise(build, lambda d: review_doc(session, course_id, d))
 
     if not doc.get("sections"):
         raise HTTPException(status_code=502, detail="the doc generator did not produce any sections")

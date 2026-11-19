@@ -10,7 +10,7 @@ from app.agents.doc import run_doc_builder
 from app.agents.mindmap import run_mindmap_builder
 from app.agents.flashcards import run_flashcard_builder
 from app.agents.quiz_builder import run_quiz_builder
-from app.agents.critic import review, review_doc
+from app.agents.critic import review, review_doc, review_cards, review_quiz, review_map
 from app.agents.memory import update_notes
 from app.agents.qa import answer as answer_question
 from app.store.versioning import revert_to
@@ -171,18 +171,23 @@ def builder(state: dict, session) -> dict:
 
 
 def critic(state: dict, session) -> dict:
-    # only the prose types run the LLM critic: slides, and docs through a
-    # section-to-slide adapter. the other types rely on the mechanical grounding
-    # checks their generators already enforce, so they pass straight through.
+    # every content type runs the LLM critic, each through its own adapter that
+    # maps its items onto the slide shape the critic checks. a fail sends the
+    # builder back with the notes (the graph's retry loop).
     kind = state.get("kind", "slides")
     draft = state.get("draft_deck", {})
-    if kind == "doc":
-        report = review_doc(session, state["course_id"], draft)
-    elif kind == "slides":
-        report = review(session, state["course_id"], draft)
-    else:
-        report = {"passed": True, "issues": []}
+    reviewer = _REVIEWERS.get(kind, review)
+    report = reviewer(session, state["course_id"], draft)
     return {"critic_report": report}
+
+
+_REVIEWERS = {
+    "slides": review,
+    "doc": review_doc,
+    "flashcards": review_cards,
+    "quiz": review_quiz,
+    "mindmap": review_map,
+}
 
 
 def route_after_critic(state: dict) -> str:

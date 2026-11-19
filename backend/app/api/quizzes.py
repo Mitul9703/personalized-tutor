@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.agents.critic import review_quiz, verify_revise
 from app.agents.grader import grade_quiz
 from app.agents.memory import record_misconceptions
 from app.agents.planner import plan_topic
@@ -51,11 +52,14 @@ def create_quiz(course_id: str, body: CreateQuiz, session: Session = Depends(get
     rows = session.query(Chunk).filter(Chunk.id.in_(chunk_ids)).all() if chunk_ids else []
     chunks = [{"id": c.id, "text": c.text, "location": c.location} for c in rows]
 
-    quiz = run_quiz_builder(
-        session, course_id,
-        plan=plan, chunks=chunks, base_quiz=None,
-        instruction=body.topic, intent="new_topic",
-    )
+    def build(base, issues):
+        return run_quiz_builder(
+            session, course_id,
+            plan=plan, chunks=chunks, base_quiz=base,
+            instruction=body.topic, intent="new_topic", issues=issues,
+        )
+
+    quiz, report = verify_revise(build, lambda q: review_quiz(session, course_id, q))
     if not quiz.get("questions"):
         raise HTTPException(status_code=502, detail="the quiz generator did not produce any questions")
 
@@ -68,7 +72,7 @@ def create_quiz(course_id: str, body: CreateQuiz, session: Session = Depends(get
     session.commit()
     version = ArtifactVersion(
         artifact_id=artifact.id, version_number=1, parent_version_id=None,
-        content=quiz, critic_report={}, caused_by="generate",
+        content=quiz, critic_report=report, caused_by="generate",
     )
     session.add(version)
     session.commit()

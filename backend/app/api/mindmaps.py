@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.agents.critic import review_map, verify_revise
 from app.agents.mindmap import run_mindmap_builder
 from app.agents.memory import update_notes
 from app.agents.planner import plan_topic
@@ -44,11 +45,16 @@ def create_mindmap(course_id: str, body: CreateMindMap, session: Session = Depen
     session.commit()
 
     plan = plan_topic(session, course_id, body.topic, _notes(session, course_id))
-    mind = run_mindmap_builder(
-        session, course_id,
-        plan=plan, chunks=_plan_chunks(session, plan), base_deck=None,
-        instruction=request, intent="new_topic",
-    )
+    chunks = _plan_chunks(session, plan)
+
+    def build(base, issues):
+        return run_mindmap_builder(
+            session, course_id,
+            plan=plan, chunks=chunks, base_deck=base,
+            instruction=request, intent="new_topic", issues=issues,
+        )
+
+    mind, report = verify_revise(build, lambda m: review_map(session, course_id, m))
     if not mind.get("nodes"):
         raise HTTPException(status_code=502, detail="the mind map generator did not produce any nodes")
 
@@ -62,7 +68,7 @@ def create_mindmap(course_id: str, body: CreateMindMap, session: Session = Depen
     session.commit()
     version = ArtifactVersion(
         artifact_id=artifact.id, version_number=1, parent_version_id=None,
-        content=mind, critic_report={}, caused_by="generate",
+        content=mind, critic_report=report, caused_by="generate",
     )
     session.add(version)
     session.commit()

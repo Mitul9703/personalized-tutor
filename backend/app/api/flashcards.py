@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.agents.critic import review_cards, verify_revise
 from app.agents.flashcards import run_flashcard_builder
 from app.agents.memory import update_notes
 from app.agents.planner import plan_topic
@@ -44,11 +45,16 @@ def create_flashcards(course_id: str, body: CreateFlashcards, session: Session =
     session.commit()
 
     plan = plan_topic(session, course_id, body.topic, _notes(session, course_id))
-    cards = run_flashcard_builder(
-        session, course_id,
-        plan=plan, chunks=_plan_chunks(session, plan), base_deck=None,
-        instruction=request, intent="new_topic",
-    )
+    chunks = _plan_chunks(session, plan)
+
+    def build(base, issues):
+        return run_flashcard_builder(
+            session, course_id,
+            plan=plan, chunks=chunks, base_deck=base,
+            instruction=request, intent="new_topic", issues=issues,
+        )
+
+    cards, report = verify_revise(build, lambda c: review_cards(session, course_id, c))
     if not cards.get("cards"):
         raise HTTPException(status_code=502, detail="the flashcard generator did not produce any cards")
 
@@ -62,7 +68,7 @@ def create_flashcards(course_id: str, body: CreateFlashcards, session: Session =
     session.commit()
     version = ArtifactVersion(
         artifact_id=artifact.id, version_number=1, parent_version_id=None,
-        content=cards, critic_report={}, caused_by="generate",
+        content=cards, critic_report=report, caused_by="generate",
     )
     session.add(version)
     session.commit()

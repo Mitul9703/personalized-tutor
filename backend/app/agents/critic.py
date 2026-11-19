@@ -103,24 +103,79 @@ def review(session, course_id, deck: dict) -> dict:
     return result
 
 
-def review_doc(session, course_id, doc: dict) -> dict:
-    # a doc is long-form prose, where an unsupported claim hides most easily,
-    # so it is reviewed like slides. A doc section maps onto a slide (a heading
-    # plus a body), so we show the critic a slide-shaped view and reuse review
-    # unchanged. The issues come back keyed by slide_id, which is the section
-    # id; we rename it to section_id so the doc generator's fixes land on the
-    # right section.
-    pseudo = {
-        "title": doc.get("title", ""),
-        "slides": [
-            {"id": s["id"], "heading": s.get("heading", ""), "bullets": [s.get("body", "")],
-             "provenance": s.get("provenance", "source"), "citations": s.get("citations", [])}
-            for s in doc.get("sections", [])
-        ],
-    }
-    report = review(session, course_id, pseudo)
+# Every content type is grounded the same way: a source item makes a claim and
+# cites the chunks that back it. So we review them all with the one Critic, by
+# mapping each type's items onto the slide shape it understands (a heading plus
+# body text), then renaming the issue id back to that type's own id so the
+# generator's fixes land on the right item.
+
+def _review_items(session, course_id, title, items, issue_key):
+    # items are already slide-shaped: {id, heading, bullets, provenance, citations}.
+    report = review(session, course_id, {"title": title, "slides": items})
     report["issues"] = [
-        {"section_id": i.get("slide_id"), "problem": i.get("problem")}
+        {issue_key: i.get("slide_id"), "problem": i.get("problem")}
         for i in report.get("issues", [])
     ]
     return report
+
+
+def review_doc(session, course_id, doc: dict) -> dict:
+    # a doc section is a heading plus a body of prose, where an unsupported claim
+    # hides most easily, so docs are always reviewed.
+    items = [
+        {"id": s["id"], "heading": s.get("heading", ""), "bullets": [s.get("body", "")],
+         "provenance": s.get("provenance", "source"), "citations": s.get("citations", [])}
+        for s in doc.get("sections", [])
+    ]
+    return _review_items(session, course_id, doc.get("title", ""), items, "section_id")
+
+
+def review_cards(session, course_id, cardset: dict) -> dict:
+    # the claim on a flashcard is its answer (the back); the front is the prompt.
+    items = [
+        {"id": c["id"], "heading": c.get("front", ""), "bullets": [c.get("back", "")],
+         "provenance": c.get("provenance", "source"), "citations": c.get("citations", [])}
+        for c in cardset.get("cards", [])
+    ]
+    return _review_items(session, course_id, cardset.get("title", ""), items, "card_id")
+
+
+def review_quiz(session, course_id, quiz: dict) -> dict:
+    # the claim on a quiz question is that its answer is correct and its
+    # explanation is supported; the stem is the prompt.
+    items = []
+    for q in quiz.get("questions", []):
+        bullets = [f"Answer: {q.get('answer', '')}"]
+        if q.get("explanation"):
+            bullets.append(q["explanation"])
+        items.append({
+            "id": q["id"], "heading": q.get("stem", ""), "bullets": bullets,
+            "provenance": q.get("provenance", "source"), "citations": q.get("citations", []),
+        })
+    return _review_items(session, course_id, quiz.get("title", ""), items, "question_id")
+
+
+def review_map(session, course_id, mind: dict) -> dict:
+    # the claim on a mind map node is its label and one-line detail.
+    items = [
+        {"id": n["id"], "heading": n.get("label", ""),
+         "bullets": [n["detail"]] if n.get("detail") else [n.get("label", "")],
+         "provenance": n.get("provenance", "source"), "citations": n.get("citations", [])}
+        for n in mind.get("nodes", [])
+    ]
+    return _review_items(session, course_id, mind.get("title", ""), items, "node_id")
+
+
+def verify_revise(build, review_fn, max_attempts=2):
+    # the generate-verify-revise loop for the dedicated endpoints, which have no
+    # graph retry loop of their own. build(base, issues) -> content and
+    # review_fn(content) -> report. The first build is from scratch; on a critic
+    # fail it revises from the last draft. Returns (content, final report).
+    content = build(None, None)
+    report = {}
+    for attempt in range(max_attempts):
+        report = review_fn(content)
+        if report.get("passed", True) or attempt + 1 >= max_attempts:
+            break
+        content = build(content, report["issues"])
+    return content, report
