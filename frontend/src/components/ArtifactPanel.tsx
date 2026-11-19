@@ -1,10 +1,12 @@
-import { Layers, Layers3, ListChecks, Maximize2, Minimize2, RotateCcw, X } from "lucide-react";
+import { FileText, Layers, Layers3, ListChecks, Maximize2, Minimize2, Network, RotateCcw, X } from "lucide-react";
 import { useStore } from "../store/useStore";
-import type { Quiz, FlashcardSet } from "../api/types";
+import type { Quiz, FlashcardSet, Doc, MindMap } from "../api/types";
 import { VersionBar } from "./VersionBar";
 import { SlideDeck } from "./SlideDeck";
 import { QuizView } from "./QuizView";
 import { FlashcardDeck } from "./FlashcardDeck";
+import { DocView } from "./DocView";
+import { MindMapView } from "./MindMapView";
 
 export function ArtifactPanel() {
   const deck = useStore((s) => s.deck);
@@ -19,11 +21,15 @@ export function ArtifactPanel() {
   const activeArtifactId = useStore((s) => s.activeArtifactId);
   const createQuiz = useStore((s) => s.createQuiz);
   const createFlashcards = useStore((s) => s.createFlashcards);
+  const createDoc = useStore((s) => s.createDoc);
+  const createMindMap = useStore((s) => s.createMindMap);
   const busy = useStore((s) => s.busy);
 
   if (!deck) return null;
   const isQuiz = detail?.type === "quiz";
   const isFlashcards = detail?.type === "flashcards";
+  const isDoc = detail?.type === "doc";
+  const isMindMap = detail?.type === "mindmap";
   const viewingNumber =
     viewing && detail ? detail.versions.find((v) => v.version_id === viewing)?.version_number : null;
 
@@ -68,6 +74,30 @@ export function ArtifactPanel() {
           >
             <Layers3 className="h-3.5 w-3.5" />
             Flashcards
+          </button>
+        )}
+
+        {!isDoc && (
+          <button
+            onClick={() => createDoc(deck.title)}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-brand hover:bg-brandsoft disabled:opacity-40"
+            title="Write a doc on this topic"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Doc
+          </button>
+        )}
+
+        {!isMindMap && (
+          <button
+            onClick={() => createMindMap(deck.title)}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-brand hover:bg-brandsoft disabled:opacity-40"
+            title="Make a mind map on this topic"
+          >
+            <Network className="h-3.5 w-3.5" />
+            Mind map
           </button>
         )}
 
@@ -117,6 +147,10 @@ export function ArtifactPanel() {
             artifactId={activeArtifactId}
             versionId={viewing ?? detail?.current_version_id ?? null}
           />
+        ) : isDoc ? (
+          <DocView doc={deck as unknown as Doc} readOnly={!!viewing} />
+        ) : isMindMap ? (
+          <MindMapView map={deck as unknown as MindMap} readOnly={!!viewing} />
         ) : (
           <SlideDeck deck={deck} readOnly={!!viewing} />
         )}

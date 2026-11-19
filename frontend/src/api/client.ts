@@ -4,7 +4,9 @@ import type {
   CreateQuizResponse,
   Deck,
   DeckRef,
+  DocResponse,
   FlashcardResponse,
+  MindMapResponse,
   Outline,
   LearnerProfile,
   OnboardingResponse,
@@ -114,6 +116,34 @@ export const api = {
     fetch(`${BASE}/artifacts/${artifactId}/revert/${versionId}`, {
       method: "POST",
     }).then(unwrap<{ artifact_id: string; version_id: string; version_number: number; deck: Deck }>),
+
+  createDoc: (courseId: string, topic: string) =>
+    fetch(`${BASE}/courses/${courseId}/docs`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ topic }),
+    }).then(unwrap<DocResponse>),
+
+  editDoc: (artifactId: string, instruction: string) =>
+    fetch(`${BASE}/artifacts/${artifactId}/docs/edit`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ instruction }),
+    }).then(unwrap<DocResponse>),
+
+  createMindMap: (courseId: string, topic: string) =>
+    fetch(`${BASE}/courses/${courseId}/mindmaps`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ topic }),
+    }).then(unwrap<MindMapResponse>),
+
+  editMindMap: (artifactId: string, instruction: string) =>
+    fetch(`${BASE}/artifacts/${artifactId}/mindmaps/edit`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ instruction }),
+    }).then(unwrap<MindMapResponse>),
 
   createQuiz: (courseId: string, topic: string) =>
     fetch(`${BASE}/courses/${courseId}/quizzes`, {

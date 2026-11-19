@@ -52,6 +52,51 @@ export interface FlashcardResponse {
   content: FlashcardSet;
 }
 
+export interface DocSection {
+  id: string;
+  heading: string;
+  body: string;
+  provenance: "source" | "supplementary";
+  citations: Citation[];
+}
+
+export interface Doc {
+  title: string;
+  sections: DocSection[];
+}
+
+export interface DocResponse {
+  intent: string;
+  type: "doc";
+  artifact_id: string;
+  version_id: string;
+  version_number: number;
+  content: Doc;
+}
+
+export interface MindNode {
+  id: string;
+  label: string;
+  detail: string;
+  parent_id: string | null;
+  provenance: "source" | "supplementary";
+  citations: Citation[];
+}
+
+export interface MindMap {
+  title: string;
+  nodes: MindNode[];
+}
+
+export interface MindMapResponse {
+  intent: string;
+  type: "mindmap";
+  artifact_id: string;
+  version_id: string;
+  version_number: number;
+  content: MindMap;
+}
+
 export interface VersionMeta {
   version_id: string;
   version_number: number;

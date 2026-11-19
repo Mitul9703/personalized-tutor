@@ -79,6 +79,10 @@ interface State {
   setPanelMode: (mode: PanelMode) => void;
   createFlashcards: (topic: string) => Promise<void>;
   editFlashcards: (instruction: string) => Promise<void>;
+  createDoc: (topic: string) => Promise<void>;
+  editDoc: (instruction: string) => Promise<void>;
+  createMindMap: (topic: string) => Promise<void>;
+  editMindMap: (instruction: string) => Promise<void>;
   refreshDecks: () => Promise<void>;
   dismissError: () => void;
   createQuiz: (topic: string) => Promise<void>;
@@ -363,6 +367,120 @@ export const useStore = create<State>((set, get) => ({
         messages: [
           ...s.messages,
           { id: rid(), role: "system", text: `Updated flashcards "${res.content.title}".`, artifactId: activeArtifactId },
+        ],
+        deck: res.content as unknown as Deck,
+        artifactDetail: detail,
+        viewingVersionId: null,
+      }));
+    } catch (e) {
+      set({ error: String(e) });
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  createDoc: async (topic) => {
+    const { courseId } = get();
+    if (!courseId || !topic.trim()) return;
+    set((s) => ({
+      messages: [...s.messages, { id: rid(), role: "learner", text: `Write a doc about ${topic}` }],
+      busy: true,
+      error: null,
+    }));
+    try {
+      const res = await api.createDoc(courseId, topic);
+      const detail = await api.getArtifact(res.artifact_id);
+      set((s) => ({
+        messages: [
+          ...s.messages,
+          { id: rid(), role: "system", text: `Created doc "${res.content.title}".`, artifactId: res.artifact_id },
+        ],
+        activeArtifactId: res.artifact_id,
+        deck: res.content as unknown as Deck,
+        artifactDetail: detail,
+        viewingVersionId: null,
+        panelMode: s.panelMode === "closed" ? "split" : s.panelMode,
+      }));
+      await get().refreshDecks();
+    } catch (e) {
+      set({ error: String(e) });
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  editDoc: async (instruction) => {
+    const { activeArtifactId } = get();
+    if (!activeArtifactId || !instruction.trim()) return;
+    set((s) => ({
+      messages: [...s.messages, { id: rid(), role: "learner", text: instruction }],
+      busy: true,
+      error: null,
+    }));
+    try {
+      const res = await api.editDoc(activeArtifactId, instruction);
+      const detail = await api.getArtifact(activeArtifactId);
+      set((s) => ({
+        messages: [
+          ...s.messages,
+          { id: rid(), role: "system", text: `Updated doc "${res.content.title}".`, artifactId: activeArtifactId },
+        ],
+        deck: res.content as unknown as Deck,
+        artifactDetail: detail,
+        viewingVersionId: null,
+      }));
+    } catch (e) {
+      set({ error: String(e) });
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  createMindMap: async (topic) => {
+    const { courseId } = get();
+    if (!courseId || !topic.trim()) return;
+    set((s) => ({
+      messages: [...s.messages, { id: rid(), role: "learner", text: `Make a mind map about ${topic}` }],
+      busy: true,
+      error: null,
+    }));
+    try {
+      const res = await api.createMindMap(courseId, topic);
+      const detail = await api.getArtifact(res.artifact_id);
+      set((s) => ({
+        messages: [
+          ...s.messages,
+          { id: rid(), role: "system", text: `Created mind map "${res.content.title}".`, artifactId: res.artifact_id },
+        ],
+        activeArtifactId: res.artifact_id,
+        deck: res.content as unknown as Deck,
+        artifactDetail: detail,
+        viewingVersionId: null,
+        panelMode: s.panelMode === "closed" ? "split" : s.panelMode,
+      }));
+      await get().refreshDecks();
+    } catch (e) {
+      set({ error: String(e) });
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  editMindMap: async (instruction) => {
+    const { activeArtifactId } = get();
+    if (!activeArtifactId || !instruction.trim()) return;
+    set((s) => ({
+      messages: [...s.messages, { id: rid(), role: "learner", text: instruction }],
+      busy: true,
+      error: null,
+    }));
+    try {
+      const res = await api.editMindMap(activeArtifactId, instruction);
+      const detail = await api.getArtifact(activeArtifactId);
+      set((s) => ({
+        messages: [
+          ...s.messages,
+          { id: rid(), role: "system", text: `Updated mind map "${res.content.title}".`, artifactId: activeArtifactId },
         ],
         deck: res.content as unknown as Deck,
         artifactDetail: detail,
