@@ -124,7 +124,7 @@ export function MindMapView({ map, readOnly }: { map: MindMap; readOnly: boolean
                     className={cn(
                       "absolute flex flex-col justify-center rounded-xl border px-3 py-2 text-left shadow-sm transition",
                       isRoot ? "bg-brand text-white border-brand" : "bg-panel hover:border-brand/40",
-                      !isRoot && supplementary ? "border-amber-300" : !isRoot ? "border-line" : "",
+                      !isRoot && supplementary ? "border-gold" : !isRoot ? "border-line" : "",
                       n.id === selectedId && !isRoot ? "ring-2 ring-brand" : "",
                       n.id === selectedId && isRoot ? "ring-2 ring-brand/40" : ""
                     )}
@@ -135,9 +135,9 @@ export function MindMapView({ map, readOnly }: { map: MindMap; readOnly: boolean
                     {!isRoot && (
                       <span className="mt-0.5 flex items-center gap-1 text-[9px]">
                         {supplementary ? (
-                          <span className="text-amber-500">◆ beyond materials</span>
+                          <span className="text-gold">◆ beyond materials</span>
                         ) : (
-                          <span className="text-emerald-600">● from materials</span>
+                          <span className="text-goldink">● from materials</span>
                         )}
                       </span>
                     )}
@@ -199,12 +199,12 @@ export function MindMapView({ map, readOnly }: { map: MindMap; readOnly: boolean
             {selected.visual && <Visual visual={selected.visual} className="mb-3 [&_svg]:max-h-[220px]" />}
             <div className="mb-2">
               {selected.provenance === "supplementary" ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                <span className="inline-flex items-center gap-1 rounded-full bg-goldsoft px-2 py-0.5 text-[11px] font-medium text-goldink">
                   <Sparkles className="h-3 w-3" />
                   beyond your materials
                 </span>
               ) : (
-                <span className="text-[11px] text-emerald-600">from your materials</span>
+                <span className="text-[11px] text-goldink">from your materials</span>
               )}
             </div>
             <div className="flex flex-wrap gap-1.5">

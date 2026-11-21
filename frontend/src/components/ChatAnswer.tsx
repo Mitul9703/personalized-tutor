@@ -50,7 +50,7 @@ export function ChatAnswer({
       )}
 
       {usesGeneralKnowledge && (
-        <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+        <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-goldsoft px-2 py-0.5 text-[11px] font-medium text-goldink">
           <Sparkles className="h-3 w-3" />
           includes general knowledge, not from your files
         </div>

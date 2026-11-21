@@ -9,13 +9,23 @@ function ensureMermaid() {
   if (!mermaidReady) {
     mermaid.initialize({
       startOnLoad: false,
-      theme: "neutral",
+      theme: "base",
       securityLevel: "strict", // no click handlers, no raw HTML labels
       // render labels as SVG <text>, not HTML <foreignObject>, so they survive
       // the DOMPurify SVG sanitiser (which drops foreignObject).
       htmlLabels: false,
       flowchart: { htmlLabels: false, curve: "basis" },
       fontFamily: "Inter, system-ui, sans-serif",
+      themeVariables: {
+        primaryColor: "#f6e8ec", // node fill: light maroon
+        primaryBorderColor: "#8c1d40", // maroon border
+        primaryTextColor: "#1a1a1a",
+        lineColor: "#8c1d40", // maroon edges
+        secondaryColor: "#fff4d6", // gold-tinted
+        secondaryBorderColor: "#ffc627",
+        tertiaryColor: "#ffffff",
+        fontFamily: "Inter, system-ui, sans-serif",
+      },
     });
     mermaidReady = true;
   }

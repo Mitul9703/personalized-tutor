@@ -37,12 +37,12 @@ export function DocView({ doc, readOnly }: { doc: Doc; readOnly: boolean }) {
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h2 className="text-lg font-semibold text-ink/90">{s.heading}</h2>
                   {supplementary ? (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-goldsoft px-2 py-0.5 text-[11px] font-medium text-goldink">
                       <Sparkles className="h-3 w-3" />
                       beyond your materials
                     </span>
                   ) : (
-                    <span className="shrink-0 text-[11px] text-emerald-600">from your materials</span>
+                    <span className="shrink-0 text-[11px] text-goldink">from your materials</span>
                   )}
                 </div>
                 <Markdown className="text-[15px] leading-relaxed text-ink/80">{s.body}</Markdown>

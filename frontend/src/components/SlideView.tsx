@@ -32,12 +32,12 @@ export function SlideView({ slide, index, total, readOnly }: {
           Slide {index + 1} of {total}
         </span>
         {supplementary ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
+          <span className="inline-flex items-center gap-1 rounded-full bg-goldsoft px-2 py-0.5 font-medium text-goldink">
             <Sparkles className="h-3 w-3" />
             beyond your materials
           </span>
         ) : (
-          <span className="text-emerald-600">from your materials</span>
+          <span className="text-goldink">from your materials</span>
         )}
       </div>
 
@@ -46,7 +46,7 @@ export function SlideView({ slide, index, total, readOnly }: {
       <ul className="mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto">
         {slide.bullets.map((b, i) => (
           <li key={i} className="flex gap-3 text-[15px] leading-relaxed text-ink/80">
-            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand/60" />
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
             <Markdown inline className="min-w-0 flex-1">{b}</Markdown>
           </li>
         ))}

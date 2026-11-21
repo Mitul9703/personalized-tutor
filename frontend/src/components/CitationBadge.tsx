@@ -30,7 +30,7 @@ export function CitationBadge({ citation, label: labelOverride }: { citation: Ci
     <span className="relative inline-block">
       <button
         onClick={toggle}
-        className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100"
+        className="inline-flex items-center gap-1 rounded-md bg-goldsoft px-1.5 py-0.5 text-[11px] font-medium text-goldink hover:bg-[#ffe6a3]"
       >
         <BookOpen className="h-3 w-3" />
         {label}

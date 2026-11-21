@@ -69,12 +69,12 @@ export function QuizView({ quiz, artifactId, versionId }: {
               <div className="mb-1 flex items-center justify-between text-xs text-ink/40">
                 <span>Question {i + 1} of {quiz.questions.length}</span>
                 {q.provenance === "supplementary" ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-goldsoft px-2 py-0.5 font-medium text-goldink">
                     <Sparkles className="h-3 w-3" />
                     beyond your materials
                   </span>
                 ) : (
-                  <span className="text-emerald-600">from your materials</span>
+                  <span className="text-goldink">from your materials</span>
                 )}
               </div>
               <Markdown className="mt-1 text-[15px] font-medium leading-relaxed">{q.stem}</Markdown>

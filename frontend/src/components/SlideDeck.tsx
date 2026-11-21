@@ -27,7 +27,7 @@ export function SlideDeck({ deck, readOnly }: { deck: Deck; readOnly: boolean })
           >
             <div className="mb-1 flex items-center justify-between text-[9px] text-ink/40">
               <span>{i + 1}</span>
-              {s.provenance === "supplementary" && <span className="text-amber-500">◆</span>}
+              {s.provenance === "supplementary" && <span className="text-gold">◆</span>}
             </div>
             <div className="line-clamp-2 text-[11px] font-medium text-ink/70">{s.heading}</div>
           </button>

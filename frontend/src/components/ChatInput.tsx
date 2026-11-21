@@ -47,7 +47,7 @@ export function ChatInput() {
       {focusedSlide && (
         <div className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-brandsoft px-2.5 py-1 text-xs text-brand">
           Re: Slide {focusedIndex + 1} · {focusedSlide.heading}
-          <button onClick={() => focusSlide(null)} className="hover:text-indigo-800">
+          <button onClick={() => focusSlide(null)} className="hover:text-branddark">
             <X className="h-3 w-3" />
           </button>
         </div>
@@ -70,7 +70,7 @@ export function ChatInput() {
         <button
           onClick={submit}
           disabled={busy || !text.trim()}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-white transition hover:bg-indigo-600 disabled:opacity-40"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-white transition hover:bg-branddark disabled:opacity-40"
         >
           <Send className="h-4 w-4" />
         </button>

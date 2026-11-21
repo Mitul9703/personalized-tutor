@@ -58,7 +58,7 @@ export function FlashcardDeck({ set, readOnly }: { set: FlashcardSet; readOnly: 
           >
             <div className="mb-1 flex items-center justify-between text-[9px] text-ink/40">
               <span>{i + 1}</span>
-              {c.provenance === "supplementary" && <span className="text-amber-500">◆</span>}
+              {c.provenance === "supplementary" && <span className="text-gold">◆</span>}
             </div>
             <Markdown inline className="line-clamp-2 text-[11px] font-medium text-ink/70">{c.front}</Markdown>
           </button>
@@ -71,12 +71,12 @@ export function FlashcardDeck({ set, readOnly }: { set: FlashcardSet; readOnly: 
             Card {current + 1} of {cards.length}
           </span>
           {supplementary ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
+            <span className="inline-flex items-center gap-1 rounded-full bg-goldsoft px-2 py-0.5 font-medium text-goldink">
               <Sparkles className="h-3 w-3" />
               beyond your materials
             </span>
           ) : (
-            <span className="text-emerald-600">from your materials</span>
+            <span className="text-goldink">from your materials</span>
           )}
         </div>
 
