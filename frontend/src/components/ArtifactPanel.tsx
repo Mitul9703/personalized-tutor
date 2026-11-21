@@ -1,12 +1,15 @@
-import { FileText, Layers, Layers3, ListChecks, Maximize2, Minimize2, Network, RotateCcw, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Download, FileText, Layers, Layers3, ListChecks, Loader2, Maximize2, Minimize2, Network, RotateCcw, X } from "lucide-react";
 import { useStore } from "../store/useStore";
-import type { Quiz, FlashcardSet, Doc, MindMap } from "../api/types";
+import type { Doc, FlashcardSet, MindMap, Quiz } from "../api/types";
 import { VersionBar } from "./VersionBar";
 import { SlideDeck } from "./SlideDeck";
 import { QuizView } from "./QuizView";
 import { FlashcardDeck } from "./FlashcardDeck";
 import { DocView } from "./DocView";
 import { MindMapView } from "./MindMapView";
+import { ArtifactPdf } from "./ArtifactPdf";
+import { exportBlocksPdf } from "../lib/pdf";
 
 export function ArtifactPanel() {
   const deck = useStore((s) => s.deck);
@@ -24,6 +27,32 @@ export function ArtifactPanel() {
   const createDoc = useStore((s) => s.createDoc);
   const createMindMap = useStore((s) => s.createMindMap);
   const busy = useStore((s) => s.busy);
+
+  const [exporting, setExporting] = useState(false);
+  const pdfRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!exporting) return;
+    const el = pdfRef.current;
+    if (!el || !detail || !deck) {
+      setExporting(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        await exportBlocksPdf(el, deck.title ?? detail.title, { slideMode: detail.type === "slides" });
+      } catch (e) {
+        if (!cancelled) useStore.setState({ error: `Could not make the PDF: ${e}` });
+      } finally {
+        if (!cancelled) setExporting(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exporting]);
 
   if (!deck) return null;
   const isQuiz = detail?.type === "quiz";
@@ -102,6 +131,16 @@ export function ArtifactPanel() {
         )}
 
         <button
+          onClick={() => !exporting && setExporting(true)}
+          disabled={busy || exporting}
+          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-brand hover:bg-brandsoft disabled:opacity-40"
+          title="Download this as a PDF"
+        >
+          {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+          PDF
+        </button>
+
+        <button
           onClick={() => setPanelMode(panelMode === "full" ? "split" : "full")}
           className="rounded-md p-1.5 text-ink/50 hover:bg-black/5"
           title={panelMode === "full" ? "Split view" : "Fullscreen"}
@@ -120,18 +159,18 @@ export function ArtifactPanel() {
       <VersionBar />
 
       {viewing && (
-        <div className="flex items-center gap-2 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+        <div className="flex items-center gap-2 bg-goldsoft px-4 py-2 text-xs text-goldink">
           <span>Viewing version {viewingNumber} (older, read-only).</span>
           <button
             onClick={() => restoreVersion(viewing)}
-            className="ml-auto inline-flex items-center gap-1 rounded-md bg-amber-600 px-2 py-1 font-medium text-white hover:bg-amber-700"
+            className="ml-auto inline-flex items-center gap-1 rounded-md bg-brand px-2 py-1 font-medium text-white hover:bg-branddark"
           >
             <RotateCcw className="h-3 w-3" />
             Restore this
           </button>
           <button
             onClick={() => selectVersion(null)}
-            className="rounded-md px-2 py-1 font-medium hover:bg-amber-100"
+            className="rounded-md px-2 py-1 font-medium hover:bg-goldsoft"
           >
             Back to latest
           </button>
@@ -155,6 +194,14 @@ export function ArtifactPanel() {
           <SlideDeck deck={deck} readOnly={!!viewing} />
         )}
       </div>
+
+      {exporting && detail && (
+        <div aria-hidden className="pointer-events-none fixed left-[-10000px] top-0 -z-10">
+          <div ref={pdfRef}>
+            <ArtifactPdf detail={detail} deck={deck as any} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
