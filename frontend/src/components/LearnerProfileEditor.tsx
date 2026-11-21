@@ -6,6 +6,7 @@ import { Button } from "./ui/Button";
 function ProfileDialog({ onClose }: { onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const profile = useStore((s) => s.learnerProfile);
+  const notes = useStore((s) => s.learnerNotes);
   const loaded = useStore((s) => s.profileLoaded);
   const loading = useStore((s) => s.profileLoading);
   const saving = useStore((s) => s.profileSaving);
@@ -17,7 +18,10 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     const element = dialog.current!;
     element.showModal();
+    // refresh so the running notes reflect everything the tutor has learned so far
+    void loadProfile();
     return () => element.close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const close = () => {
@@ -33,6 +37,18 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
       <p id="learner-profile-description" className="mb-5 mt-2 text-sm text-ink/60">
         Changes apply to future lessons. Your saved lessons and learning history stay available.
       </p>
+      {loaded && (
+        <div className="mb-5 rounded-xl border border-line bg-panel p-4 text-left">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink/40">
+            What the tutor has learned about you
+          </div>
+          {notes && notes.trim() ? (
+            <p className="whitespace-pre-line text-sm leading-relaxed text-ink/70">{notes}</p>
+          ) : (
+            <p className="text-sm text-ink/40">Nothing yet — this fills in as you work through the material.</p>
+          )}
+        </div>
+      )}
       {loaded ? (
         <LearnerProfileForm initialProfile={profile} submitLabel="Save profile" disabled={saving || busy} error={error}
           onCancel={close} onSubmit={async (values) => { if (await saveProfile(values)) close(); }} />

@@ -7,6 +7,7 @@ export interface LearnerProfile {
 export interface OnboardingResponse {
   course_id: string;
   profile: LearnerProfile | null;
+  notes?: string;
 }
 
 export interface Citation {

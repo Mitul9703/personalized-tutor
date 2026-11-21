@@ -14,3 +14,5 @@ class LearnerProfile(BaseModel):
 class OnboardingResponse(BaseModel):
     course_id: str
     profile: LearnerProfile | None
+    # the tutor's running notes about the learner, built up over the session.
+    notes: str = ""

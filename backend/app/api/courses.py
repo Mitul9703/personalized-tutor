@@ -53,7 +53,7 @@ def get_onboarding(course_id: str, session: Session = Depends(get_session)):
         profile = LearnerProfile.model_validate(row.profile if row else {})
     except ValidationError:
         profile = None
-    return OnboardingResponse(course_id=course_id, profile=profile)
+    return OnboardingResponse(course_id=course_id, profile=profile, notes=(row.notes if row else "") or "")
 
 
 @router.post("/courses/{course_id}/onboarding", response_model=OnboardingResponse)

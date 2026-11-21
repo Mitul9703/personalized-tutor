@@ -48,6 +48,7 @@ interface State {
   courseTitle: string | null;
   outline: Outline | null;
   learnerProfile: LearnerProfile | null;
+  learnerNotes: string | null;
   profileLoading: boolean;
   profileLoaded: boolean;
   profileSaving: boolean;
@@ -95,6 +96,7 @@ export const useStore = create<State>((set, get) => ({
   courseTitle: null,
   outline: null,
   learnerProfile: null,
+  learnerNotes: null,
   profileLoading: false,
   profileLoaded: false,
   profileSaving: false,
@@ -180,7 +182,7 @@ export const useStore = create<State>((set, get) => ({
     set({ profileLoading: true, profileError: null });
     try {
       const res = await api.getOnboarding(courseId);
-      if (get().courseId === courseId && sequence === profileLoadSequence) set({ learnerProfile: res.profile, profileLoaded: true });
+      if (get().courseId === courseId && sequence === profileLoadSequence) set({ learnerProfile: res.profile, learnerNotes: res.notes ?? "", profileLoaded: true });
     } catch (e) {
       if (get().courseId === courseId && sequence === profileLoadSequence) set({ profileError: String(e) });
     } finally {
@@ -211,7 +213,7 @@ export const useStore = create<State>((set, get) => ({
     ++profileLoadSequence;
     set({
       phase: "ingesting", ingestMsg: "Loading your course…", courseId, courseTitle: null, error: null,
-      learnerProfile: null, profileError: null, profileLoading: false, profileLoaded: false, profileSaving: false,
+      learnerProfile: null, learnerNotes: null, profileError: null, profileLoading: false, profileLoaded: false, profileSaving: false,
       setupProgress: null, outline: null, messages: [], decks: [], activeArtifactId: null,
       deck: null, artifactDetail: null, viewingVersionId: null, focusedSlideId: null, panelMode: "closed",
     });
