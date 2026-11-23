@@ -14,7 +14,10 @@ VISUAL_SCHEMA = {
         "'flowchart TD; A[Light] --> B[PSII]'); 'svg' for a complete, self-contained "
         "<svg> with a viewBox, simple shapes, text labels, and colour. Keep it small and "
         "readable: a handful of nodes in a top-down flow (flowchart TD), short plain labels, "
-        "and avoid wide rows or deeply nested subgraphs. No scripts, click events, HTML "
+        "and avoid wide rows or deeply nested subgraphs. In Mermaid, put every node label "
+        "in double quotes, e.g. A[\"Gradient: (-10, -8)\"], because parentheses, brackets, "
+        "and other punctuation in an unquoted label break the diagram; write math in labels "
+        "as plain text (eta, x^2), not LaTeX. No scripts, click events, HTML "
         "labels, or external references."
     ),
     "properties": {

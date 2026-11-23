@@ -5,6 +5,8 @@
 
 import json
 
+from app.llm import model_json
+
 from openai import OpenAI
 
 from app.config import settings
@@ -32,7 +34,7 @@ def chat_json(messages, model=None, **kwargs):
         response_format={"type": "json_object"},
         **kwargs,
     )
-    return json.loads(response.choices[0].message.content)
+    return model_json.loads(response.choices[0].message.content)
 
 
 def chat_tools(messages, tools, model=None, **kwargs):
@@ -48,7 +50,7 @@ def chat_tools(messages, tools, model=None, **kwargs):
         model=model or settings.llm_model,
         messages=messages,
         tools=tools,
-        tool_choice="auto",
+        tool_choice=kwargs.pop("tool_choice", "auto"),
         **kwargs,
     )
     return response.choices[0].message

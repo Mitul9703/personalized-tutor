@@ -6,6 +6,8 @@
 
 import json
 
+from app.llm import model_json
+
 from app.llm.chat import chat_tools
 
 
@@ -31,7 +33,7 @@ def run_agent(system, user, tools, handlers, max_steps=6):
         for call in message.tool_calls:
             name = call.function.name
             try:
-                args = json.loads(call.function.arguments or "{}")
+                args = model_json.loads(call.function.arguments or "{}")
             except json.JSONDecodeError:
                 args = {}
 
@@ -51,5 +53,19 @@ def run_agent(system, user, tools, handlers, max_steps=6):
 
         if stop:
             break
+    else:
+        # the fuse ran out while the model was still calling tools (usually
+        # one more search). rather than lose everything it gathered, give it
+        # one last turn that must call finish with what it already has.
+        if any(t.get("function", {}).get("name") == "finish" for t in tools):
+            message = chat_tools(messages, tools,
+                                 tool_choice={"type": "function", "function": {"name": "finish"}})
+            for call in message.tool_calls or []:
+                if call.function.name == "finish":
+                    try:
+                        result = model_json.loads(call.function.arguments or "{}")
+                    except json.JSONDecodeError:
+                        result = {}
+                    break
 
     return result

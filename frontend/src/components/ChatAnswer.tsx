@@ -1,12 +1,15 @@
-import { Fragment } from "react";
+import type { Components } from "react-markdown";
 import { Sparkles } from "lucide-react";
 import type { Citation } from "../api/types";
 import { CitationBadge } from "./CitationBadge";
+import { Markdown } from "./Markdown";
+
+const CITE_HREF = "#cite-";
 
 // A tutor reply in the chat. The QA agent puts markers like [1] in the text,
-// and citations[n - 1] is the chunk behind marker [n]. Each marker becomes a
-// clickable badge that shows the exact source text, and a numbered source
-// list sits under the reply.
+// and citations[n - 1] is the chunk behind marker [n]. The reply renders as
+// markdown with LaTeX math; each marker becomes a clickable badge that shows
+// the exact source text, and a numbered source list sits under the reply.
 export function ChatAnswer({
   text,
   citations,
@@ -17,20 +20,26 @@ export function ChatAnswer({
   usesGeneralKnowledge?: boolean;
 }) {
   const cites = citations ?? [];
-  const parts = text.split(/(\[\d+\])/g);
+
+  // turn each [n] that has a citation into a markdown link (#cite-n), then
+  // render those links as source badges. markers with no citation stay as text.
+  const withLinks = text.replace(/\[(\d+)\](?!\()/g, (marker, n) =>
+    cites[Number(n) - 1] ? `[${n}](${CITE_HREF}${n})` : marker
+  );
+  const components: Components = {
+    a: ({ href, children }) => {
+      if (href?.startsWith(CITE_HREF)) {
+        const n = href.slice(CITE_HREF.length);
+        const cite = cites[Number(n) - 1];
+        if (cite) return <CitationBadge citation={cite} label={n} />;
+      }
+      return <a href={href} target="_blank" rel="noreferrer">{children}</a>;
+    },
+  };
 
   return (
     <div>
-      <div className="whitespace-pre-wrap">
-        {parts.map((part, i) => {
-          const m = part.match(/^\[(\d+)\]$/);
-          const cite = m ? cites[Number(m[1]) - 1] : null;
-          if (m && cite) {
-            return <CitationBadge key={i} citation={cite} label={m[1]} />;
-          }
-          return <Fragment key={i}>{part}</Fragment>;
-        })}
-      </div>
+      <Markdown components={components}>{withLinks}</Markdown>
 
       {cites.some(Boolean) && (
         <div className="mt-2 border-t border-line pt-2">
