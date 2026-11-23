@@ -41,6 +41,43 @@ def _fix(match: re.Match) -> str:
     return match.group(0)                 # a real JSON escape such as \n or é
 
 
+# some models also send a LaTeX backslash as a JSON escape that is valid but
+# wrong, e.g. "\u0007eta" (bell + "eta") for "\eta". that parses cleanly, so the
+# fix above never sees it; we repair the decoded strings instead.
+#   - bell, backspace, vertical tab and form feed never belong in study text, so
+#     before a letter they always stand for a lost backslash (\b and \f also ate
+#     the command's first letter, so we put it back).
+#   - tab, newline and carriage return are real text, so inside $...$ math we
+#     only repair them before a known command (\theta, \nabla, \right, ...).
+_CONTROL_BEFORE_LETTER = re.compile(r"([\x07\x08\x0b\x0c])(?=[A-Za-z])")
+_CONTROL_AS = {"\x07": "\\", "\x08": "\\b", "\x0b": "\\v", "\x0c": "\\f"}
+_MATH = re.compile(r"\$\$.+?\$\$|\$[^$\n]*?\$|\$[^$]+?\$", re.DOTALL)
+_WHITESPACE_COMMANDS = re.compile(
+    # "not followed by a letter" rather than \b, so $\theta_t$ (underscore) matches
+    r"\t(?=(?:heta|au|imes|ext|extbf|op|ilde|riangle|frac|anh|an)(?![A-Za-z]))"
+    r"|\n(?=(?:abla|eq|e|u|ot|otin|i|onumber|eg|leq|geq)(?![A-Za-z]))"
+    r"|\r(?=(?:ho|ight|angle|ightarrow|ceil|floor|m|Vert|vert)(?![A-Za-z]))"
+)
+_WHITESPACE_AS = {"\t": "\\t", "\n": "\\n", "\r": "\\r"}
+
+
+def _repair_text(s: str) -> str:
+    s = _CONTROL_BEFORE_LETTER.sub(lambda m: _CONTROL_AS[m.group(1)], s)
+    return _MATH.sub(
+        lambda m: _WHITESPACE_COMMANDS.sub(lambda w: _WHITESPACE_AS[w.group(0)], m.group(0)), s
+    )
+
+
+def _repair(value):
+    if isinstance(value, str):
+        return _repair_text(value)
+    if isinstance(value, list):
+        return [_repair(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _repair(v) for k, v in value.items()}
+    return value
+
+
 def loads(text: str):
     """json.loads for model output, keeping LaTeX backslashes intact."""
-    return json.loads(_TOKEN.sub(_fix, text or ""))
+    return _repair(json.loads(_TOKEN.sub(_fix, text or "")))

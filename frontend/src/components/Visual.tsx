@@ -9,6 +9,9 @@ function ensureMermaid() {
   if (!mermaidReady) {
     mermaid.initialize({
       startOnLoad: false,
+      // on a syntax error mermaid otherwise draws its own "Syntax error in
+      // text" bomb graphic into a temp node in <body> and leaves it there.
+      suppressErrorRendering: true,
       theme: "base",
       securityLevel: "strict", // no click handlers, no raw HTML labels
       // render labels as SVG <text>, not HTML <foreignObject>, so they survive
@@ -29,6 +32,19 @@ function ensureMermaid() {
     });
     mermaidReady = true;
   }
+}
+
+// Agents often write labels with parentheses or other punctuation, e.g.
+// A[Gradient: (-10,-8)] or B[Compute f'(x)]. Mermaid reads "(" inside an
+// unquoted [label] as shape syntax and rejects the whole diagram; the label is
+// only valid quoted: A["Gradient: (-10,-8)"]. This wraps unquoted [...] and
+// {...} labels in quotes (escaping any " inside). Used only as a retry when the
+// diagram as written does not parse, so valid diagrams render untouched.
+function quoteLabels(code: string): string {
+  const quote = (text: string) => `"${text.trim().replace(/"/g, "#quot;")}"`;
+  return code
+    .replace(/(\b[A-Za-z][\w-]*)\[(?!["[(])([^\[\]"\n]*?)\](?!\])/g, (_, id, text) => `${id}[${quote(text)}]`)
+    .replace(/(\b[A-Za-z][\w-]*)\{(?!["{])([^{}"\n]*?)\}/g, (_, id, text) => `${id}{${quote(text)}}`);
 }
 
 // DOMPurify with the SVG profile strips <script>, event handlers, and foreign
@@ -58,10 +74,29 @@ export function Visual({ visual, className }: { visual: VisualType; className?: 
     }
     if (visual.format === "mermaid") {
       ensureMermaid();
-      mermaid
-        .render(id, code)
-        .then(({ svg }) => alive && setHtml(sanitizeSvg(svg)))
-        .catch(() => alive && setFailed(true));
+      // mermaid.render builds the diagram in temporary nodes in <body> (#id and
+      // #d<id>). they are removed on success but can linger after a failure,
+      // so clear them out whenever a render does not succeed.
+      const cleanup = () => {
+        document.getElementById(id)?.remove();
+        document.getElementById("d" + id)?.remove();
+      };
+      (async () => {
+        // check the syntax first, so an invalid diagram is never rendered. if
+        // it fails, retry with its labels quoted (the most common agent mistake).
+        let source = code;
+        if (!(await mermaid.parse(source, { suppressErrors: true }))) {
+          source = quoteLabels(code);
+          if (!(await mermaid.parse(source, { suppressErrors: true }))) {
+            throw new Error("invalid mermaid syntax");
+          }
+        }
+        const { svg } = await mermaid.render(id, source);
+        if (alive) setHtml(sanitizeSvg(svg));
+      })().catch(() => {
+        cleanup();
+        if (alive) setFailed(true);
+      });
     } else {
       const clean = sanitizeSvg(code);
       if (clean.includes("<svg")) setHtml(clean);

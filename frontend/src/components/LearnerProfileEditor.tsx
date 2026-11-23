@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../store/useStore";
 import { LearnerProfileForm } from "./LearnerProfileForm";
+import { Markdown } from "./Markdown";
 import { Button } from "./ui/Button";
 
 function ProfileDialog({ onClose }: { onClose: () => void }) {
@@ -43,7 +44,8 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
             What the tutor has learned about you
           </div>
           {notes && notes.trim() ? (
-            <p className="whitespace-pre-line text-sm leading-relaxed text-ink/70">{notes}</p>
+            // markdown + math, keeping each note on its own line (a markdown hard break)
+            <Markdown className="text-sm leading-relaxed text-ink/70">{notes.trim().replace(/\n+/g, "  \n")}</Markdown>
           ) : (
             <p className="text-sm text-ink/40">Nothing yet — this fills in as you work through the material.</p>
           )}
